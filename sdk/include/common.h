@@ -97,6 +97,6 @@ namespace chat_sdk
         }
     };
 
-};
+}
 
 #endif
