@@ -1,6 +1,6 @@
 #ifndef LOGGER_H
 #define LOGGER_H
-
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE 
 #include <spdlog/spdlog.h> // 需要 spdlog 的日志宏和 level 枚举
 #include <memory>
 #include <mutex>
