@@ -1,3 +1,9 @@
+/**
+ * @file fields.h
+ * @author yui
+ */
+
+
 #ifndef FIELDS_H
 #define FIELDS_H
 namespace chat_sdk
@@ -13,7 +19,7 @@ namespace chat_sdk
         constexpr const char *DELTA = "delta";
         constexpr const char *STREAM = "stream";
         constexpr const char *TEMPERATURE = "temperature"; 
-        constexpr const char *MAX_TOKEN = "max_tokens"; 
+        constexpr const char *MAX_TOKENS = "max_tokens"; 
     }
 }
 #endif
