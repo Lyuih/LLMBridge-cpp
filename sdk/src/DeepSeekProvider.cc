@@ -201,10 +201,10 @@ namespace chat_sdk
             msg_array.append(msg);
         }
         Json::Value request_body;
-        request_body[MODEL] = "deepseek-chat";
+        request_body[MODEL] = getModelName();
         request_body[MESSAGES] = msg_array;
         request_body[TEMPERATURE] = temp;
-        request_body[MAX_TOKEN] = max_tokens;
+        request_body[MAX_TOKENS] = max_tokens;
         request_body[STREAM] = stream;
         // 序列化
         Json::StreamWriterBuilder writer;
