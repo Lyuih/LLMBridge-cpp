@@ -58,9 +58,9 @@ namespace chat_sdk
               updated_at(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))
         {
         }
-        void update(std::time_t &time)
+        void update()
         {
-            updated_at = time;
+            updated_at = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         }
     };
 
@@ -95,6 +95,7 @@ namespace chat_sdk
               isInit_(false)
         {
         }
+        ModelInfo() = default;
     };
 
 }
