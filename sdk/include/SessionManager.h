@@ -10,6 +10,7 @@
 #include <mutex>
 #include <vector>
 #include <memory>
+#include <DataManager.h>
 #include "common.h"
 
 namespace chat_sdk
@@ -17,6 +18,7 @@ namespace chat_sdk
     class SessionManager
     {
     public:
+        SessionManager();
         // 创建新会话
         std::string createSession(const std::string &model_name);
         // 获取具体会话,通过会话id获取,返回会话指针
@@ -43,6 +45,7 @@ namespace chat_sdk
         std::string generateMessageId();
 
     private:
+        DataManager dataManager_;
         std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;
         mutable std::mutex mutex_;
         static std::atomic<int64_t> message_counter_;
