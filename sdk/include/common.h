@@ -36,9 +36,9 @@ namespace chat_sdk
         std::string role;      // user / system
         std::string content;   // 消息内容
         std::time_t timestamp; // 消息生成时间
-        Message(const std::string &r, const std::string &con)
-            : role(r),
-              content(con),
+        Message(const std::string &role_, const std::string &content_)
+            : role(role_),
+              content(content_),
               timestamp(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()))
         {
         }
@@ -77,6 +77,13 @@ namespace chat_sdk
     struct ApiConfig : public Config
     {
         std::string api_key;
+    };
+
+    // ollama 接入本地模型
+    struct OllamaConfig : public Config
+    {
+        std::string model_desc_;
+        std::string endPoint_;
     };
 
     // LLM模型信息
