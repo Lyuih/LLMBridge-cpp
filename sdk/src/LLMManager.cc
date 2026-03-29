@@ -50,6 +50,19 @@ namespace chat_sdk
         }
         return it->second->isAvailable();
     }
+    // 获取所有可以模型列表
+    std::vector<ModelInfo> LLMManager::getAvailableModel()
+    {
+        std::vector<ModelInfo> model_infos;
+        for (const auto &pair : modelInfo_)
+        {
+            if (pair.second.isInit_)
+            {
+                model_infos.push_back(pair.second);
+            }
+        }
+        return model_infos;
+    }
     // 发送消息给指定模型
     std::string LLMManager::sendMessage(const std::string &model_name, const std::vector<Message> &messages,
                                         const std::map<std::string, std::string> &request_param)

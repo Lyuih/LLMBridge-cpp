@@ -21,9 +21,11 @@ namespace chat_sdk
         // 注册LLM提供者
         bool registerProvider(const std::string &model_name, std::unique_ptr<LLMProvider> provider);
         // 初始化制定模型
-        bool initModel(const std::string& model_name, const std::map<std::string, std::string> &model_param);
+        bool initModel(const std::string &model_name, const std::map<std::string, std::string> &model_param);
         // 检查模型是否可用
         bool isModelAvilable(const std::string &model_name) const;
+        // 获取所有可以模型列表
+        std::vector<ModelInfo> getAvailableModel();
         // 发送消息给指定模型
         std::string sendMessage(const std::string &model_name, const std::vector<Message> &messages,
                                 const std::map<std::string, std::string> &request_param);
