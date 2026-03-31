@@ -75,7 +75,7 @@ namespace chat_sdk
         return session;
     }
     // 添加消息到会话
-    bool SessionManager::addMessage(const std::string &session_id, const std::string &role, const std::string &content)
+    bool SessionManager::addMessage(const std::string &session_id, Message&msg)
     {
         std::unique_lock<std::mutex> lock(mutex_);
         auto it = sessions_.find(session_id);
@@ -84,9 +84,9 @@ namespace chat_sdk
             LOG_ERROR("添加消息到会话失败,没有该会话{}", session_id);
             return false;
         }
-        Message msg(role, content);
+        // Message msg(role, content);
         msg.id = generateMessageId();
-        it->second->messages.push_back(std::move(msg));
+        it->second->messages.push_back(msg);
         lock.unlock();
         updateSessionTimestamp(session_id);
         LOG_INFO("添加消息到会话中:{}:{}", session_id, msg.content);
@@ -167,8 +167,8 @@ namespace chat_sdk
             return;
         }
         it->second->update();
-        lock.unlock();
-        dataManager_.updateSessionTimestamp(session_id, it->second->updated_at);
+        // lock.unlock();
+        // dataManager_.updateSessionTimestamp(session_id, it->second->updated_at);
         return;
     }
     // 清空所有会话

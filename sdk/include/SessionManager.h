@@ -25,15 +25,14 @@ namespace chat_sdk
         // 获取具体会话,通过会话id获取,返回会话指针
         std::shared_ptr<Session> getSession(const std::string &session_id);
         // 添加消息到会话
-        bool addMessage(const std::string &session_id, const std::string &role, const std::string &content);
+        bool addMessage(const std::string &session_id, Message &msg);
         // 获取会话历史信息
         std::vector<Message> getSessionHistory(const std::string &session_id);
         // 获取会话列表
         std::vector<std::string> getSessionList() const;
         // 删除会话
         bool deleteSession(const std::string &session_id);
-        // 更新会话时间戳
-        void updateSessionTimestamp(const std::string &session_id);
+
         // 清空所有会话
         void clearAllSession();
         // 获取会话总数
@@ -44,6 +43,8 @@ namespace chat_sdk
         std::string generateSessionId();
         // 生成唯一消息id
         std::string generateMessageId();
+        // 更新会话时间戳
+        void updateSessionTimestamp(const std::string &session_id);
 
     private:
         DataManager dataManager_;
@@ -54,4 +55,5 @@ namespace chat_sdk
     };
 
 }
+
 #endif

@@ -288,7 +288,7 @@ namespace chat_sdk
             LOG_ERROR("stmt绑定失败:{}", sqlite3_errmsg(db_));
             return false;
         }
-        sqlite3_bind_int64(update_stmt, 1, static_cast<int64_t>(std::time(nullptr)));
+        sqlite3_bind_int64(update_stmt, 1, static_cast<int64_t>(message.timestamp));
         sqlite3_bind_text(update_stmt, 2, session_id.c_str(), -1, SQLITE_TRANSIENT);
         rc = sqlite3_step(update_stmt);
         if (rc != SQLITE_DONE)
