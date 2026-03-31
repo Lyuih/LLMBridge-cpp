@@ -60,7 +60,7 @@ namespace chat_sdk
         }
         void update()
         {
-            updated_at = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+            updated_at = messages.back().timestamp;
         }
     };
 

@@ -74,8 +74,8 @@ namespace chat_sdk
         }
 
         // 构建消息并添加到会话
-        // Message user_message("user",message);
-        sessionManager_.addMessage(session_id, "user", message);
+        Message user_message("user",message);
+        sessionManager_.addMessage(session_id, user_message);
 
         // 构建请求参数
         auto it_config = configs_.find(session->model_name);
@@ -94,9 +94,9 @@ namespace chat_sdk
         std::vector<Message> history = sessionManager_.getSessionHistory(session_id);
         std::string response = llmManager_.sendMessage(session->model_name, history, request_params);
         // 添加助手响应并更新会话时间
-        // Message assistanMsg("assistant", response);
-        sessionManager_.addMessage(session_id, "assistant", response);
-        sessionManager_.updateSessionTimestamp(session_id);
+        Message assistanMsg("assistant", response);
+        sessionManager_.addMessage(session_id, assistanMsg);
+        // sessionManager_.updateSessionTimestamp(session_id);
         return response;
     }
     // 发送消息 流
@@ -118,8 +118,8 @@ namespace chat_sdk
         }
 
         // 构建消息并添加到会话
-        // Message user_message("user",message);
-        sessionManager_.addMessage(session_id, "user", message);
+        Message user_message("user",message);
+        sessionManager_.addMessage(session_id, user_message);
 
         // 构建请求参数
         auto it_config = configs_.find(session->model_name);
@@ -139,9 +139,9 @@ namespace chat_sdk
         std::string response = llmManager_.sendMessageStream(session->model_name,
                                                              history, request_params, call_back);
         // 添加助手响应并更新会话时间
-        // Message assistanMsg("assistant", response);
-        sessionManager_.addMessage(session_id, "assistant", response);
-        sessionManager_.updateSessionTimestamp(session_id);
+        Message assistanMsg("assistant", response);
+        sessionManager_.addMessage(session_id, assistanMsg);
+        // sessionManager_.updateSessionTimestamp(session_id);
         return response;
     }
 
