@@ -103,7 +103,7 @@ namespace chat_sdk
     void DataManager::updateSessionTimestamp(const std::string &session_id, std::time_t timestamp)
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        const std::string sql = "UPDATA sessions SET update_time = ? WHERE session_id = ?;";
+        const std::string sql = "UPDATE sessions SET update_time = ? WHERE session_id = ?;";
 
         sqlite3_stmt *stmt = nullptr;
         int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
@@ -178,7 +178,7 @@ namespace chat_sdk
     {
         std::lock_guard<std::mutex> lock(mutex_);
         std::vector<std::shared_ptr<Session>> sessions;
-        const std::string sql = "SELECT session_id,model_name,create_time,update_time FROM sessions OPDER BY update_time DESC;";
+        const std::string sql = "SELECT session_id,model_name,create_time,update_time FROM sessions ORDER BY update_time DESC;";
         sqlite3_stmt *stmt = nullptr;
         int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
         if (rc != SQLITE_OK)
@@ -274,32 +274,31 @@ namespace chat_sdk
         if (rc != SQLITE_DONE)
         {
             sqlite3_finalize(stmt); // 释放stmt
-
             LOG_ERROR("添加消息失败:{}", sqlite3_errmsg(db_));
             return false;
         }
         sqlite3_finalize(stmt); // 释放stmt
 
         // 更新session
-        const std::string updata_sql = "UPDATA sessions SET updata_time=? WHERE session_id = ?;";
-        sqlite3_stmt *updata_stmt = nullptr;
-        rc = sqlite3_prepare_v2(db_, updata_sql.c_str(), -1, &updata_stmt, nullptr);
+        const std::string update_sql = "UPDATE sessions SET update_time=? WHERE session_id = ?;";
+        sqlite3_stmt *update_stmt = nullptr;
+        rc = sqlite3_prepare_v2(db_, update_sql.c_str(), -1, &update_stmt, nullptr);
         if (rc != SQLITE_OK)
         {
             LOG_ERROR("stmt绑定失败:{}", sqlite3_errmsg(db_));
             return false;
         }
-        sqlite3_bind_int64(updata_stmt, 1, static_cast<int64_t>(std::time(nullptr)));
-        sqlite3_bind_text(updata_stmt, 2, session_id.c_str(), -1, SQLITE_TRANSIENT);
-        rc = sqlite3_step(updata_stmt);
+        sqlite3_bind_int64(update_stmt, 1, static_cast<int64_t>(std::time(nullptr)));
+        sqlite3_bind_text(update_stmt, 2, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        rc = sqlite3_step(update_stmt);
         if (rc != SQLITE_DONE)
         {
-            sqlite3_finalize(updata_stmt); // 释放stmt
+            sqlite3_finalize(update_stmt); // 释放stmt
 
             LOG_ERROR("更新session失败:{}", sqlite3_errmsg(db_));
             return false;
         }
-        sqlite3_finalize(updata_stmt);
+        sqlite3_finalize(update_stmt);
         return true;
     }
     // 获取指定会话历史消息
