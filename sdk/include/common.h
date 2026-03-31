@@ -77,6 +77,8 @@ namespace chat_sdk
     struct ApiConfig : public Config
     {
         std::string api_key;
+        std::string model_desc_;
+        std::string endPoint_;
     };
 
     // ollama 接入本地模型
