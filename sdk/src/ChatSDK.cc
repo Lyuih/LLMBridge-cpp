@@ -148,31 +148,26 @@ namespace chat_sdk
     // 注册所有模型
     void ChatSDK::registerAllProvider(const std::vector<std::shared_ptr<Config>> &configs)
     {
-        // DeepSeek-chat
-        if (llmManager_.isModelAvilable("deepseek-chat"))
+
+        for (auto &config : configs)
         {
-            auto deepseek_provider = std::make_unique<DeepSeekProvider>();
-            llmManager_.registerProvider("deepseek-chat", std::move(deepseek_provider));
-            LOG_INFO("deepseek-chat 注册成功");
+            
+            if (auto api_config = std::dynamic_pointer_cast<ApiConfig>(config))
+            {
+                auto deepseek_provider = std::make_unique<DeepSeekProvider>();
+                llmManager_.registerProvider(api_config->model_name, std::move(deepseek_provider));
+                LOG_INFO("{}注册成功", api_config->model_name);
+            }
+            else if(auto ollama_config = std::dynamic_pointer_cast<OllamaConfig>(config))
+            {
+                // TODO_ Ollama接入
+            }
+            else
+            {
+
+            }
         }
 
-        // Gemini-2.0-flash
-        if (llmManager_.isModelAvilable("gemini-2.0-flash"))
-        {
-            auto gemini_provider = std::make_unique<GeminiProvider>();
-            llmManager_.registerProvider("gemini-2.0-flash", std::move(gemini_provider));
-            LOG_INFO("gemini-2.0-flash 注册成功");
-        }
-
-        // chat-4o-mini
-        if (llmManager_.isModelAvilable("chat-4o-mini"))
-        {
-            auto gpt_provider = std::make_unique<GPTProvider>();
-            llmManager_.registerProvider("chat-4o-mini", std::move(gpt_provider));
-            LOG_INFO("chat-4o-mini 注册成功");
-        }
-
-        // TODO_ Ollama接入
     }
     // 初始化所有模型提供者
     void ChatSDK::initProviders(const std::vector<std::shared_ptr<Config>> &configs)
@@ -219,6 +214,7 @@ namespace chat_sdk
         // 初始化模型
         std::map<std::string, std::string> model_params;
         model_params["api_key"] = api_config->api_key;
+        model_params["base_url"] = api_config->endPoint_;
         if (!llmManager_.initModel(model_name, model_params))
         {
             return false;
