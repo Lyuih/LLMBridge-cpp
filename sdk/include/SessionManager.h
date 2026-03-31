@@ -10,8 +10,9 @@
 #include <mutex>
 #include <vector>
 #include <memory>
-#include <DataManager.h>
+#include "DataManager.h"
 #include "common.h"
+#include "UUIDUtil.h"
 
 namespace chat_sdk
 {
@@ -48,10 +49,9 @@ namespace chat_sdk
         DataManager dataManager_;
         std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;
         mutable std::mutex mutex_;
-        static std::atomic<int64_t> message_counter_;
-        static std::atomic<int64_t> session_counter_;
+        // static std::atomic<int64_t> message_counter_;
+        // static std::atomic<int64_t> session_counter_;
     };
-    std::atomic<int64_t> SessionManager::message_counter_{0};
-    std::atomic<int64_t> SessionManager::session_counter_{0};
+
 }
 #endif

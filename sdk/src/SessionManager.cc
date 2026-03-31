@@ -14,6 +14,8 @@
  */
 namespace chat_sdk
 {
+    // std::atomic<int64_t> SessionManager::message_counter_{0};
+    // std::atomic<int64_t> SessionManager::session_counter_{0};
     SessionManager::SessionManager()
         : dataManager_("chatDB.db")
     {
@@ -46,18 +48,20 @@ namespace chat_sdk
     // 获取具体会话,通过会话id获取,返回会话指针
     std::shared_ptr<Session> SessionManager::getSession(const std::string &session_id)
     {
-        std::unique_lock<std::mutex> lock(mutex_);
-        auto it = sessions_.find(session_id);
-        if (it != sessions_.end())
         {
-            return it->second;
+            std::unique_lock<std::mutex> lock(mutex_);
+            auto it = sessions_.find(session_id);
+            if (it != sessions_.end())
+            {
+                LOG_INFO("获取内存中会话成功:{}", session_id);
+                return it->second;
+            }
         }
-        lock.unlock();
 
         // 内存中没有,去数据库看看
         auto session = dataManager_.getSession(session_id);
         std::unique_lock<std::mutex> lock(mutex_);
-        if (session = nullptr)
+        if (session == nullptr)
         {
             LOG_ERROR("会话不存在:{}", session_id);
             return nullptr;
@@ -67,6 +71,7 @@ namespace chat_sdk
         lock.unlock();
         // 获取会话历史数据
         session->messages = dataManager_.getMessageBySessionId(session_id);
+        LOG_INFO("获取数据库中会话成功:{}", session_id);
         return session;
     }
     // 添加消息到会话
@@ -82,9 +87,9 @@ namespace chat_sdk
         Message msg(role, content);
         msg.id = generateMessageId();
         it->second->messages.push_back(std::move(msg));
+        lock.unlock();
         updateSessionTimestamp(session_id);
         LOG_INFO("添加消息到会话中:{}:{}", session_id, msg.content);
-        lock.unlock();
         dataManager_.insertMessage(session_id, msg);
         return true;
     }
@@ -186,19 +191,11 @@ namespace chat_sdk
     // 生成唯一会话id
     std::string SessionManager::generateSessionId()
     {
-        // 会话id格式: session_时间戳_消息计数
-        session_counter_.fetch_add(1);
-        std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::ostringstream oss;
-        oss << "session_" << time << "_" << std::setfill('0') << std::setw(8) << session_counter_;
+        return generate_uuid_v4();
     }
     // 生成唯一消息id
     std::string SessionManager::generateMessageId()
     {
-        // 会话id格式: msg_时间戳_消息计数
-        message_counter_.fetch_add(1);
-        std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::ostringstream oss;
-        oss << "msg_" << time << "_" << std::setfill('0') << std::setw(8) << message_counter_;
+        return generate_uuid_v4();
     }
 }
