@@ -42,6 +42,11 @@ namespace chat_sdk
     // 检查模型是否可用
     bool LLMManager::isModelAvilable(const std::string &model_name) const
     {
+        if(providers_.empty())
+        {
+            LOG_WARN("当前没有模型提供者");
+            return false;
+        }
         auto it = providers_.find(model_name);
         if (it == providers_.end())
         {
