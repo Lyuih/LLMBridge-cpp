@@ -4,6 +4,8 @@
 #include "../sdk/include/GeminiProvider.h"
 #include "../sdk/include/GPTProvider.h"
 #include "../sdk/include/LLMManager.h"
+#include "../sdk/include/OllamaLLMProvider.h"
+
 #include "../sdk/include/ChatSDK.h"
 #include "../sdk/include/common.h"
 
@@ -174,7 +176,6 @@ TEST(LLMManagerTest, ProviderTest)
     ASSERT_FALSE(response.empty());
     // LOG_INFO("response:{}", response);
 }
-#endif
 
 TEST(ChatSDKTest, ChatSDKInitTest)
 {
@@ -225,6 +226,54 @@ TEST(ChatSDKTest, ChatSDKInitTest)
         std::cout << msg.role << ": " << msg.content << std::endl;
     }
     ASSERT_FALSE(messages.empty());
+}
+
+TEST(OllamaLLMProviderTest, sendMessageOllama)
+{
+    std::map<std::string, std::string> param_map;
+    // param_map["api_key"] = std::getenv("deepseek_apikey");
+    param_map["model_name"] = "qwen2:1.5b";
+    param_map["model_desc"] = "我是一个人工智能助手，专门在这里帮助人们解答问题。有其他问题我可以回答吗";
+    param_map["temperature"] = "0.7";
+    param_map["base_url"] = "http://127.0.0.1:11434";
+    auto ollamaProvider = std::make_shared<chat_sdk::OllamaLLMProvider>();
+    ASSERT_TRUE(ollamaProvider != nullptr);
+    ollamaProvider->initModel(param_map);
+    ASSERT_TRUE(ollamaProvider->isAvailable());
+
+    std::vector<chat_sdk::Message> messages;
+    messages.push_back({"user", "你好"});
+    std::string response = ollamaProvider->sendMessage(messages, param_map);
+    ASSERT_FALSE(response.empty());
+    LOG_INFO("response:{}", response);
+}
+#endif
+
+
+TEST(OllamaLLMProviderTest, sendMessageOllamaStream)
+{
+    std::map<std::string, std::string> param_map;
+    // param_map["api_key"] = std::getenv("deepseek_apikey");
+    param_map["model_name"] = "qwen2:1.5b";
+    param_map["model_desc"] = "我是一个人工智能助手，专门在这里帮助人们解答问题。有其他问题我可以回答吗";
+    param_map["temperature"] = "0.7";
+    param_map["base_url"] = "http://127.0.0.1:11434";
+    auto ollamaProvider = std::make_shared<chat_sdk::OllamaLLMProvider>();
+    ASSERT_TRUE(ollamaProvider != nullptr);
+    ollamaProvider->initModel(param_map);
+    ASSERT_TRUE(ollamaProvider->isAvailable());
+
+    std::vector<chat_sdk::Message> messages;
+    messages.push_back({"user", "你是谁"});
+    std::string response = ollamaProvider->sendMessageStream(messages, param_map, [&](const std::string &chunk, bool last)
+                                                             {
+        LOG_INFO("chunk: {}",chunk);
+        if(last)
+        {
+            LOG_INFO("[DONE]");
+        } });
+    ASSERT_FALSE(response.empty());
+    LOG_INFO("response:{}", response);
 }
 
 int main(int argc, char *argv[])

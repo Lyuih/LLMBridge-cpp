@@ -20,6 +20,7 @@ add_executable(LLMTest testLLM.cc
     ../sdk/src/DataManager.cc
     ../sdk/src/ChatSDK.cc
     ../sdk/src/UUIDUtil.cc
+    ../sdk/src/OllamaLLMProvider.cc
     ../sdk/src/SessionManager.cc ../sdk/src/logger.cc)
 
 # 设置输出目录
