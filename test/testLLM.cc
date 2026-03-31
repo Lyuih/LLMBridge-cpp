@@ -4,6 +4,8 @@
 #include "../sdk/include/GeminiProvider.h"
 #include "../sdk/include/GPTProvider.h"
 #include "../sdk/include/LLMManager.h"
+#include "../sdk/include/ChatSDK.h"
+#include "../sdk/include/common.h"
 
 #if 0
 TEST(DeepSeekProviderTest, sendMessageDeepSeek)
@@ -143,7 +145,6 @@ TEST(GPTProviderTest, sendMessageGPT)
     LOG_INFO("response:{}", response);
 }
 
-#endif
 TEST(LLMManagerTest, ProviderTest)
 {
     std::map<std::string, std::string> param_map;
@@ -172,6 +173,58 @@ TEST(LLMManagerTest, ProviderTest)
     std::string response = manager.sendMessage("deepseek-chat", messages, param_map);
     ASSERT_FALSE(response.empty());
     // LOG_INFO("response:{}", response);
+}
+#endif
+
+TEST(ChatSDKTest, ChatSDKInitTest)
+{
+    auto sdk = std::make_shared<chat_sdk::ChatSDK>();
+    ASSERT_TRUE(sdk != nullptr);
+
+    // 配置支持的模型参数,云模型-deepseek gpt gemini
+    auto deepseek_config = std::make_shared<chat_sdk::ApiConfig>();
+    ASSERT_TRUE(deepseek_config != nullptr);
+    deepseek_config->model_name = "deepseek-chat";
+    const char *deepseek_apikey = getenv("deepseek_apikey");
+    ASSERT_TRUE(deepseek_apikey != nullptr);
+    deepseek_config->api_key = deepseek_apikey;
+    deepseek_config->endPoint_ = "https://api.deepseek.com";
+
+    // gpt TODO_
+
+    // gemini
+
+    auto gemini_config = std::make_shared<chat_sdk::ApiConfig>();
+    ASSERT_TRUE(gemini_config != nullptr);
+
+    gemini_config->model_name = "gemini-2.0-flash";
+    const char *gemini_apikey = getenv("gemini_apikey");
+    ASSERT_TRUE(gemini_apikey != nullptr);
+    gemini_config->api_key = gemini_apikey;
+    gemini_config->endPoint_ = "https://generativelanguage.googleapis.com";
+
+    // 加入sdk
+    std::vector<std::shared_ptr<chat_sdk::Config>> configs{deepseek_config, gemini_config};
+
+    ASSERT_TRUE(sdk->initModels(configs));
+
+    // 创建会话
+    auto session_id = sdk->createSession(deepseek_config->model_name);
+    ASSERT_FALSE(session_id.empty());
+
+    std::string message = "你好";
+    // std::cout << ">>>";
+    // std::getline(std::cin, message);
+    auto response = sdk->sendMessage(session_id, message);
+    ASSERT_FALSE(response.empty());
+
+    // 获取会话历史消息
+    auto messages = sdk->sessionManager_.getSessionHistory(session_id);
+    for (const auto &msg : messages)
+    {
+        std::cout << msg.role << ": " << msg.content << std::endl;
+    }
+    ASSERT_FALSE(messages.empty());
 }
 
 int main(int argc, char *argv[])
