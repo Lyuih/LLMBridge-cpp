@@ -2,6 +2,7 @@
 #include "../include/DeepSeekProvider.h"
 #include "../include/GPTProvider.h"
 #include "../include/GeminiProvider.h"
+#include "../include/OllamaLLMProvider.h"
 #include "../include/logger.h"
 #include "../include/fields.h"
 
@@ -74,7 +75,7 @@ namespace chat_sdk
         }
 
         // 构建消息并添加到会话
-        Message user_message("user",message);
+        Message user_message("user", message);
         sessionManager_.addMessage(session_id, user_message);
 
         // 构建请求参数
@@ -101,7 +102,7 @@ namespace chat_sdk
     }
     // 发送消息 流
     std::string ChatSDK::sendMessageStream(const std::string &session_id, const std::string &message,
-                                           LLMProvider::func_stream &call_back)
+                                           const LLMProvider::func_stream &call_back)
     {
         using namespace json_fields;
         if (!initialized_)
@@ -118,7 +119,7 @@ namespace chat_sdk
         }
 
         // 构建消息并添加到会话
-        Message user_message("user",message);
+        Message user_message("user", message);
         sessionManager_.addMessage(session_id, user_message);
 
         // 构建请求参数
@@ -151,23 +152,40 @@ namespace chat_sdk
 
         for (auto &config : configs)
         {
-            
+
             if (auto api_config = std::dynamic_pointer_cast<ApiConfig>(config))
             {
-                auto deepseek_provider = std::make_unique<DeepSeekProvider>();
-                llmManager_.registerProvider(api_config->model_name, std::move(deepseek_provider));
-                LOG_INFO("{}注册成功", api_config->model_name);
+                if (api_config->model_name == "deepseek-chat")
+                {
+                    auto deepseek_provider = std::make_unique<DeepSeekProvider>();
+                    llmManager_.registerProvider(api_config->model_name, std::move(deepseek_provider));
+                    LOG_INFO("{}注册成功", api_config->model_name);
+                }
+                else if (api_config->model_name == "gemini-2.0-flash")
+                {
+                    auto gemini_provider = std::make_unique<GeminiProvider>();
+                    llmManager_.registerProvider(api_config->model_name, std::move(gemini_provider));
+                    LOG_INFO("{}注册成功", api_config->model_name);
+                }
+                else if (api_config->model_name == "chat-4o-mini")
+                {
+                    auto gpt_provider = std::make_unique<GPTProvider>();
+                    llmManager_.registerProvider(api_config->model_name, std::move(gpt_provider));
+                    LOG_INFO("{}注册成功", api_config->model_name);
+                }
             }
-            else if(auto ollama_config = std::dynamic_pointer_cast<OllamaConfig>(config))
+            else if (auto ollama_config = std::dynamic_pointer_cast<OllamaConfig>(config))
             {
-                // TODO_ Ollama接入
+                // TODO_ 解决ollama多模型接入
+                auto ollama_provider = std::make_unique<OllamaLLMProvider>();
+                llmManager_.registerProvider(ollama_config->model_name, std::move(ollama_provider));
+                LOG_INFO("{}注册成功", ollama_config->model_name);
             }
             else
             {
-
+                LOG_ERROR("错误错误,不支持");
             }
         }
-
     }
     // 初始化所有模型提供者
     void ChatSDK::initProviders(const std::vector<std::shared_ptr<Config>> &configs)
@@ -189,7 +207,7 @@ namespace chat_sdk
             }
             else if (auto ollamaConfig = std::dynamic_pointer_cast<OllamaConfig>(config))
             {
-                ; // TODO_ Ollama接入
+                initOllamaModelProviders(ollamaConfig->model_desc_, ollamaConfig); // TODO_ Ollama接入
             }
             else
             {
@@ -224,4 +242,39 @@ namespace chat_sdk
         LOG_INFO("模型 {} 初始化成功", model_name);
         return true;
     }
+    bool ChatSDK::initOllamaModelProviders(const std::string &model_name, const std::shared_ptr<OllamaConfig> &ollama_config)
+    {
+        if (model_name.empty())
+        {
+            LOG_ERROR("model_name为空");
+            return false;
+        }
+
+        if (!ollama_config || ollama_config->endPoint_.empty())
+        {
+            LOG_ERROR("api_key为空");
+            return false;
+        }
+
+        // // 初始化模型提供者
+        // if (llmManager_.isModelAvailable(modelName))
+        // {
+        //     INFO("ChatSDK::initAPIModelProviders: model {} is already available", modelName);
+        //     return true;
+        // }
+
+        // 初始化模型
+        std::map<std::string, std::string> model_params;
+        model_params["base_url"] = ollama_config->endPoint_;
+        model_params["model_name"] = ollama_config->model_name;
+        model_params["model_desc"] = ollama_config->model_desc_;
+        if (!llmManager_.initModel(model_name, model_params))
+        {
+            return false;
+        }
+        configs_[model_name] = ollama_config;
+        LOG_INFO("模型{}初始化成功", model_name);
+        return true;
+    }
+
 }

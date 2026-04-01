@@ -30,7 +30,7 @@ namespace chat_sdk
         std::string sendMessage(const std::string &session_id, const std::string &message);
         // 发送消息 流
         std::string sendMessageStream(const std::string &session_id, const std::string &message,
-                                      LLMProvider::func_stream &call_back);
+                                      const LLMProvider::func_stream &call_back);
 
     private:
         // 注册所有模型
@@ -38,7 +38,7 @@ namespace chat_sdk
         // 初始化所有模型提供者
         void initProviders(const std::vector<std::shared_ptr<Config>> &configs);
         // 初始化模型提供者 通过ollama
-        // bool ollamaProviderInit(const std::stinrg &modelName, const std::shared_ptr<OllamaConfig> &ollamaConfig);
+        bool initOllamaModelProviders(const std::string &modelName, const std::shared_ptr<OllamaConfig> &ollamaConfig);
         // 初始化模型提供者 - API模型提供者
         bool initAPIModelProviders(const std::string &model_name, const std::shared_ptr<ApiConfig> &api_config);
 
