@@ -1,0 +1,60 @@
+# CMake的最低版本
+cmake_minimum_required(VERSION,3.10)
+
+# 项目名称
+project(LLMBridge)
+
+# C++标准
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 设置构建类型
+set(CMAKE_BUILD_TYPE Debug)
+
+# 设置可执行文件名,添加目标文件
+add_executable(LLMBridge,grpc_server.cc
+    ./src/DeepSeekProvider.cc
+    ./src/GeminiProvider.cc
+    ./src/GPTProvider.cc
+    ./src/LLMManager.cc
+    ./src/DataManager.cc
+    ./src/ChatSDK.cc
+    ./src/OllamaLLMProvider.cc
+    ./src/SessionManager.cc
+    ./src/logger.cc
+    ./src/UUIDUtil.cc
+    ./src/llm_bridge.grpc.pb.cc
+    ./src/llm_bridge.pb.cc
+)
+
+# 设置输出目录
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/build)
+
+# 添加头文件搜索路径
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
+# 查找OpenSSL包
+find_package(OpenSSL REQUIRED)
+
+# 包含OpennSSL头文件路径
+include_directories(${OPENSSL_INCLUDE_DIR})
+
+# 寻找 gRPC 和 Protobuf 库
+find_package(gRPC CONFIG REQUIRED)
+find_package(Protobuf REQUIRED)
+
+# 设置库的目录
+link_directories(/usr/local/lib)
+
+# 连接库
+target_link_libraries(LLMTest
+    fmt
+    jsoncpp
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    spdlog
+    sqlite3
+    gRPC::grpc++
+    gRPC::grpc++_reflection
+    protobuf::libprotobuf
+)
