@@ -30,7 +30,7 @@ namespace chat_sdk
         std::string sendMessage(const std::string &model_name, const std::vector<Message> &messages,
                                 const std::map<std::string, std::string> &request_param);
         // 发送消息流给指定模型
-        std::string sendMessageStream(const std::string &model_name, const std::vector<Message> &messages, const std::map<std::string, std::string> &request_param, LLMProvider::func_stream &callback);
+        std::string sendMessageStream(const std::string &model_name, const std::vector<Message> &messages, const std::map<std::string, std::string> &request_param,const LLMProvider::func_stream &callback);
 
     private:
         // 项目名称 -> 模型

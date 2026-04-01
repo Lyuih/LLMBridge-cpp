@@ -86,7 +86,7 @@ namespace chat_sdk
         return it->second->sendMessage(messages, request_param);
     }
     // 发送消息流给指定模型
-    std::string LLMManager::sendMessageStream(const std::string &model_name, const std::vector<Message> &messages, const std::map<std::string, std::string> &request_param, LLMProvider::func_stream &call_back)
+    std::string LLMManager::sendMessageStream(const std::string &model_name, const std::vector<Message> &messages, const std::map<std::string, std::string> &request_param,const LLMProvider::func_stream &call_back)
     {
         auto it = providers_.find(model_name);
         if (it == providers_.end())

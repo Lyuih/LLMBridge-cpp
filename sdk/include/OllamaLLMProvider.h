@@ -8,7 +8,7 @@
 #include "LLMProvider.h"
 namespace chat_sdk
 {
-    class OllamaLLMProvider : LLMProvider
+    class OllamaLLMProvider : public LLMProvider
     {
     public:
         // 模型初始化
