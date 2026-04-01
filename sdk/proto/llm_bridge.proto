@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package llm_bridge;
+
+service LLMBridge {
+    //初始化模型
+    rpc initModels(InitModelsRequest) returns (InitModelsResponse){}
+    //创建session
+    rpc createSession(CreateSessionRequest) returns(CreateSessionResponse){}
+    //获取会话
+    rpc getSession(SessionIdRequest) returns(GetSessionResponse){}
+    //删除会话
+    rpc deleteSession(SessionIdRequest) returns(DeleteSessionResponse) {}
+    //获取所有可用模型
+    rpc getAvailableModels(GetAvailableModelsRequest) returns(GetAvailableModelsResponse){}
+    //获取所有会话列表
+    rpc getSessonList(GetSessionListRequest) returns(GetSessionListResponse){}
+    //发送消息全量
+    rpc sendMessage(SendMessageRequest) returns(SendMessageResponse){}
+    //发送消息流
+    rpc sendMessageStream(SendMessageRequest) returns(stream SendMessageResponse){}
+}
+
+message Message {
+    string message_id = 1;
+    string role = 2;
+    string content = 3;
+    int64 timestamp = 4;
+}
+
+message Session {
+    string session_id = 1;
+    string model_name = 2;
+    repeated Message messages = 3;
+    int64 create_at = 4;
+    int64 updated_at = 5;
+}
+
+message ModelConfig {
+  string model_name = 1;
+  string model_type = 2; // "ollama" or "api"
+  string base_url = 3;
+  string api_key = 4;
+  double temperature = 5;
+  int32 max_tokens = 6;
+  string model_desc = 7;
+}
+
+message SessionIdRequest {
+    string session_id = 1;
+}
+
+message GetSessionResponse {
+    Session session = 1;
+}
+
+message DeleteSessionResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message InitModelsRequest {
+  repeated ModelConfig configs = 1;
+}
+
+message InitModelsResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message CreateSessionRequest {
+  string model_name = 1;
+}
+
+message CreateSessionResponse {
+  string session_id = 1;
+  string error = 2;
+}
+
+message SendMessageRequest {
+  string session_id = 1;
+  string message = 2;
+}
+
+message SendMessageResponse {
+  string chunk = 1;
+  bool is_last = 2;
+  string error = 3;
+}
+
+message ModelInfo {
+    string model_name = 1;
+    string description = 2;
+    string provider = 3;
+    string endpoint = 4;
+    bool is_init = 5;
+}
+
+message GetAvailableModelsRequest {}
+
+message GetAvailableModelsResponse {
+    repeated ModelInfo models = 1;
+}
+
+message GetSessionListRequest {}
+
+message GetSessionListResponse {
+    repeated string session_ids = 1;
+}
