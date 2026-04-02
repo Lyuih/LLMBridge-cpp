@@ -244,21 +244,24 @@ void RunServer()
 {
     // 1.设置监听端口
     std::string server_address("0.0.0.0:50051");
+    LOG_INFO("LLMBrider Server 监听端口 : {}", server_address);
     LLMBridgeServiderImpl service;
     ServerBuilder builder;
-    //2.监听指定的地址和端口
-    builder.AddListeningPort(server_address,grpc::InsecureServerCredentials());
+    // 2.监听指定的地址和端口
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
-    //注册刚才实现的Service
+    // 注册刚才实现的Service
     builder.RegisterService(&service);
 
-    //3.构建并启动服务器
+    // 3.构建并启动服务器
     std::unique_ptr<Server> server(builder.BuildAndStart());
-    LOG_INFO("LLMBrider Server listening on {}",server_address);
+    LOG_INFO("LLMBrider Server listening on {}", server_address);
     server->Wait();
 }
 
 int main()
 {
+    Logger::instance().init(false, "logs/log.log", spdlog::level::trace);
+    RunServer();
     return 0;
 }

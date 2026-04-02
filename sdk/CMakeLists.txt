@@ -1,5 +1,5 @@
 # CMake的最低版本
-cmake_minimum_required(VERSION,3.10)
+cmake_minimum_required(VERSION 3.10)
 
 # 项目名称
 project(LLMBridge)
@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_BUILD_TYPE Debug)
 
 # 设置可执行文件名,添加目标文件
-add_executable(LLMBridge,grpc_server.cc
+add_executable(LLMBridge grpc_server.cc
     ./src/DeepSeekProvider.cc
     ./src/GeminiProvider.cc
     ./src/GPTProvider.cc
@@ -43,11 +43,14 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 find_package(gRPC CONFIG REQUIRED)
 find_package(Protobuf REQUIRED)
 
+# 添加编译定义
+target_compile_definitions(LLMBridge PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
+
 # 设置库的目录
 link_directories(/usr/local/lib)
 
 # 连接库
-target_link_libraries(LLMTest
+target_link_libraries(LLMBridge
     fmt
     jsoncpp
     OpenSSL::SSL
