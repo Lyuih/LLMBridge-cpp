@@ -33,6 +33,14 @@ namespace chat_sdk
             LOG_WARN("SDK未初始化");
             return "";
         }
+
+        // 增加对 model_name 的合法性校验
+        if (configs_.find(model_name) == configs_.end())
+        {
+            LOG_ERROR("模型未初始化或不支持:{}", model_name);
+            return "";
+        }
+
         std::string session_id = sessionManager_.createSession(model_name);
         LOG_INFO("创建会话成功id:{},model_name:{}", session_id, model_name);
         return session_id;
@@ -207,11 +215,11 @@ namespace chat_sdk
             }
             else if (auto ollamaConfig = std::dynamic_pointer_cast<OllamaConfig>(config))
             {
-                initOllamaModelProviders(ollamaConfig->model_desc_, ollamaConfig); // TODO_ Ollama接入
+                initOllamaModelProviders(ollamaConfig->model_name, ollamaConfig); // TODO_ Ollama接入
             }
             else
             {
-                LOG_ERROR("{}配置不支持", apiConfig->model_name);
+                LOG_ERROR("{}配置不支持", config->model_name);
             }
         }
     }
