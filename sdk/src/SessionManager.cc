@@ -23,6 +23,7 @@ namespace chat_sdk
         auto sessions = dataManager_.getAllSessions();
         for (auto &session : sessions)
         {
+            session->messages = dataManager_.getMessageBySessionId(session->id);
             sessions_[session->id] = session;
         }
         LOG_INFO("会话管理初始化完成,当前会话数:{}", sessions.size());
