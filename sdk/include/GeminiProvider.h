@@ -22,7 +22,7 @@ namespace chat_sdk
         // 获取模型名称
         virtual std::string getModelName() const override
         {
-            return "gemini-2.0-flash";
+            return "gemini-2.5-flash-lite";
         }
         // 获取描述信息
         virtual std::string getModelDesc() const override

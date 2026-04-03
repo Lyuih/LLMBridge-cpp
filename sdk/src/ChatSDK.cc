@@ -169,7 +169,7 @@ namespace chat_sdk
                     llmManager_.registerProvider(api_config->model_name, std::move(deepseek_provider));
                     LOG_INFO("{}注册成功", api_config->model_name);
                 }
-                else if (api_config->model_name == "gemini-2.0-flash")
+                else if (api_config->model_name == "gemini-2.5-flash-lite")
                 {
                     auto gemini_provider = std::make_unique<GeminiProvider>();
                     llmManager_.registerProvider(api_config->model_name, std::move(gemini_provider));
@@ -203,7 +203,7 @@ namespace chat_sdk
             if (auto apiConfig = std::dynamic_pointer_cast<ApiConfig>(config))
             {
                 if (apiConfig->model_name == "deepseek-chat" ||
-                    apiConfig->model_name == "gemini-2.0-flash" ||
+                    apiConfig->model_name == "gemini-2.5-flash-lite" ||
                     apiConfig->model_name == "chat-4o-mini")
                 {
                     initAPIModelProviders(apiConfig->model_name, apiConfig);
