@@ -306,7 +306,7 @@ namespace chat_sdk
     {
         std::lock_guard<std::mutex> lock(mutex_);
         std::vector<Message> messages;
-        const std::string sql = "SELECT message_id,role,content,timestamp FROM message WHERE session_id = ? ORDER BY timestamp ASC";
+        const std::string sql = "SELECT message_id,role,content,timestamp FROM messages WHERE session_id = ? ORDER BY timestamp ASC";
         sqlite3_stmt *stmt = nullptr;
         int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
         if (rc != SQLITE_OK)
