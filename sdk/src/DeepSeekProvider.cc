@@ -7,6 +7,48 @@
 
 namespace chat_sdk
 {
+    namespace
+    {
+        // 把 ToolDefinition 转成 OpenAI 格式的 function 对象
+        Json::Value toolToFunction(const ToolDefinition &def)
+        {
+            Json::Value func;
+            func["name"] = def.name;
+            if (!def.description.empty())
+            {
+                func["description"] = def.description;
+            }
+            Json::Value params;
+            params["type"] = "object";
+            Json::Value props;
+            Json::Value required(Json::arrayValue);
+            for (const auto &p : def.parameters)
+            {
+                Json::Value prop;
+                prop["type"] = p.type;
+                if (!p.description.empty())
+                {
+                    prop["description"] = p.description;
+                }
+                props[p.name] = prop;
+                if (p.required)
+                {
+                    required.append(p.name);
+                }
+            }
+            if (!props.empty())
+            {
+                params["properties"] = props;
+            }
+            if (!required.empty())
+            {
+                params["required"] = required;
+            }
+            func["parameters"] = params;
+            return func;
+        }
+    }
+
     // 模型初始化
     bool DeepSeekProvider::initModel(const std::map<std::string, std::string> &model_config)
     {
@@ -14,7 +56,6 @@ namespace chat_sdk
         auto it = model_config.find("api_key");
         if (it == model_config.end())
         {
-            // 没有
             LOG_ERROR("deepseek获取api_key失败!");
             return false;
         }
@@ -23,30 +64,35 @@ namespace chat_sdk
         it = model_config.find("base_url");
         if (it == model_config.end())
         {
-            // 没有
             LOG_ERROR("deepseek获取base_url失败!");
             return false;
         }
         endPoint_ = it->second;
-        // 3.标记初始化成功
+        // 3.可选: 配置自定义模型名(默认 deepseek-chat)
+        it = model_config.find("model_name");
+        if (it != model_config.end() && !it->second.empty())
+        {
+            model_name_ = it->second;
+        }
+        // 4.标记初始化成功
         isAvailable_ = true;
         LOG_INFO("成功 success");
         LOG_INFO("deepseek模型初始化成功{}", endPoint_);
         return true;
     }
 
-    // 发送消息给模型
-    // 全量返回
-    std::string DeepSeekProvider::sendMessage(const std::vector<Message> &messages,
-                                              const std::map<std::string, std::string> &request_param)
+    // 发送消息给模型 全量返回(支持工具)
+    LLMResponse DeepSeekProvider::sendMessage(const std::vector<Message> &messages,
+                                              const std::map<std::string, std::string> &request_param,
+                                              const std::vector<ToolDefinition> &tools)
     {
-        // 1.检查模型是否有效
+        LLMResponse resp;
         if (!isAvailable())
         {
-            LOG_ERROR("deepseek模型失效");
-            return "";
+            resp.error = "deepseek模型失效";
+            LOG_ERROR("{}", resp.error);
+            return resp;
         }
-        // 2.获取采用温度和最大tokens
         double temperature = 0.7;
         int max_tokens = 2048;
         if (request_param.find("temperature") != request_param.end())
@@ -57,46 +103,41 @@ namespace chat_sdk
         {
             max_tokens = std::stoi(request_param.at("max_tokens"));
         }
-        std::string json_msg = buildRequestBody(messages, temperature, max_tokens, false);
+        std::string json_msg = buildRequestBody(messages, temperature, max_tokens, false, tools);
 
-        // 创建http client
         httplib::Client client(endPoint_);
         client.set_connection_timeout(30, 0);
         client.set_read_timeout(60, 0);
-        // 请求头
         httplib::Headers headers = {
             {"Authorization", "Bearer " + api_key_},
             {"Content-Type", "application/json"}};
-        // 发送post请求
         auto response = client.Post("/v1/chat/completions", headers, json_msg, "application/json");
         if (!response)
         {
-            LOG_ERROR("连接deepseek API失败,请检查网络和ssl");
-            return "";
+            resp.error = "连接deepseek API失败,请检查网络和ssl";
+            LOG_ERROR("{}", resp.error);
+            return resp;
         }
-        LOG_DEBUG("deepseek API response status {}", response->status);
-        LOG_DEBUG("deepseel API response body {}", response->body);
-
-        // 检查响应
         if (response->status != 200)
         {
-            LOG_ERROR("deepseek API 返回非200状态 {} - {}", response->status, response->body);
-            return "";
+            resp.error = "deepseek API 返回非200状态 " + std::to_string(response->status) + " - " + response->body;
+            LOG_ERROR("{}", resp.error);
+            return resp;
         }
-        return extractContentFromJson(response->body);
+        parseResponse(response->body, resp);
+        return resp;
     }
+
     // 发送消息给模型 流式响应(每生成几个字符就触发回调函数)
     std::string DeepSeekProvider::sendMessageStream(const std::vector<Message> &messages,
                                                     const std::map<std::string, std::string> &request_param, func_stream callback)
     {
         LOG_DEBUG("流式响应");
-        // 1.检查模型是否有效
         if (!isAvailable())
         {
             LOG_ERROR("deepseek模型失效");
             return "";
         }
-        // 2.获取采用温度和最大tokens
         double temperature = 0.7;
         int max_tokens = 2048;
         if (request_param.find("temperature") != request_param.end())
@@ -108,19 +149,16 @@ namespace chat_sdk
             max_tokens = std::stoi(request_param.at("max_tokens"));
         }
 
-        std::string json_msg = buildRequestBody(messages, temperature, max_tokens, true);
+        std::string json_msg = buildRequestBody(messages, temperature, max_tokens, true, {});
 
-        // 创建http client
         httplib::Client client(endPoint_);
         client.set_connection_timeout(30, 0);
         client.set_read_timeout(60, 0);
-        // 请求头
         httplib::Headers headers = {
             {"Authorization", "Bearer " + api_key_},
             {"Accept", "text/event-stream"},
             {"Content-Type", "application/json"}};
 
-        // 流式处理变量
         std::string buffer;
         bool gotError = false;
         std::string errorMsg;
@@ -128,7 +166,6 @@ namespace chat_sdk
         bool streamFinish = false;
         std::string full_content;
 
-        // 创建请求对象
         httplib::Request req;
         req.method = "POST";
         req.path = "/v1/chat/completions";
@@ -153,8 +190,6 @@ namespace chat_sdk
                 return false;
             }
             buffer.append(data, len);
-            // std::cout << "buffer:" << buffer << std::endl;
-            LOG_INFO("buffer:{}", buffer);
             size_t pos = 0;
             while ((pos = buffer.find("\n\n")) != std::string::npos)
             {
@@ -188,16 +223,36 @@ namespace chat_sdk
     }
 
     // 负责将 Message 列表和参数转为 JSON 字符串
-    std::string DeepSeekProvider::buildRequestBody(const std::vector<Message> &messages, double temp, int max_tokens, bool stream)
+    std::string DeepSeekProvider::buildRequestBody(const std::vector<Message> &messages, double temp, int max_tokens, bool stream,
+                                                   const std::vector<ToolDefinition> &tools)
     {
         using namespace json_fields;
-        // 构建历史信息
         Json::Value msg_array;
         for (const auto &message : messages)
         {
             Json::Value msg;
             msg[ROLE] = message.role;
-            msg[CONTENT] = message.content;
+            if (message.role == "tool")
+            {
+                msg["tool_call_id"] = message.tool_call_id;
+            }
+            msg[CONTENT] = message.content.empty() ? "" : message.content;
+            if (!message.tool_calls.empty())
+            {
+                Json::Value calls(Json::arrayValue);
+                for (const auto &tc : message.tool_calls)
+                {
+                    Json::Value call;
+                    call["id"] = tc.id;
+                    call["type"] = "function";
+                    Json::Value fn;
+                    fn["name"] = tc.name;
+                    fn["arguments"] = tc.arguments;
+                    call["function"] = fn;
+                    calls.append(call);
+                }
+                msg["tool_calls"] = calls;
+            }
             msg_array.append(msg);
         }
         Json::Value request_body;
@@ -206,48 +261,78 @@ namespace chat_sdk
         request_body[TEMPERATURE] = temp;
         request_body[MAX_TOKENS] = max_tokens;
         request_body[STREAM] = stream;
-        // 序列化
+        if (!tools.empty())
+        {
+            Json::Value tools_json(Json::arrayValue);
+            for (const auto &def : tools)
+            {
+                Json::Value t;
+                t["type"] = "function";
+                t["function"] = toolToFunction(def);
+                tools_json.append(t);
+            }
+            request_body["tools"] = tools_json;
+        }
         Json::StreamWriterBuilder writer;
         std::string json_string = Json::writeString(writer, request_body);
         LOG_DEBUG("deepseek请求数据序列化成功:{}", json_string);
         return json_string;
     }
-    // 负责从返回的 JSON 中提取文本内容
-    std::string DeepSeekProvider::extractContentFromJson(const std::string &response_body)
+
+    // 从响应 JSON 解析内容 / 工具调用 / token 用量
+    void DeepSeekProvider::parseResponse(const std::string &response_body, LLMResponse &resp)
     {
         using namespace json_fields;
 
-        // 反序列化
-        Json::Value response_json;
+        Json::Value json;
         Json::CharReaderBuilder readBuilder;
         std::string errs;
         std::istringstream json_stream(response_body);
-        if (!Json::parseFromStream(readBuilder, json_stream, &response_json, &errs))
+        if (!Json::parseFromStream(readBuilder, json_stream, &json, &errs))
         {
-            LOG_ERROR("反序列化失败:{}", errs);
-            return "";
+            resp.error = "反序列化失败:" + errs;
+            LOG_ERROR("{}", resp.error);
+            return;
         }
-        if (response_json.isMember(CHOICES) &&
-            response_json[CHOICES].isArray() &&
-            !response_json[CHOICES].empty())
+
+        if (json.isMember("usage") && json["usage"].isObject())
         {
-            int sz = response_json[CHOICES].size();
-            std::string reply_content;
-            for (int i = 0; i < sz; ++i)
+            resp.input_tokens = json["usage"].get("prompt_tokens", 0).asInt();
+            resp.output_tokens = json["usage"].get("completion_tokens", 0).asInt();
+        }
+
+        if (!json.isMember(CHOICES) || !json[CHOICES].isArray() || json[CHOICES].empty())
+        {
+            resp.error = "响应缺少 choices";
+            LOG_WARN("{}", resp.error);
+            return;
+        }
+
+        const Json::Value &message = json[CHOICES][0][MESSAGE];
+        resp.content = message.get(CONTENT, "").asString();
+
+        if (message.isMember("tool_calls") && message["tool_calls"].isArray())
+        {
+            for (const auto &call : message["tool_calls"])
             {
-                auto &choice = response_json[CHOICES][i];
-                if (choice.isMember(MESSAGE) &&
-                    choice[MESSAGE].isMember(CONTENT))
+                ToolCall tc;
+                tc.id = call.get("id", "").asString();
+                if (call.isMember("function") && call["function"].isObject())
                 {
-                    reply_content += choice[MESSAGE][CONTENT].asString();
+                    tc.name = call["function"].get("name", "").asString();
+                    tc.arguments = call["function"].get("arguments", "").asString();
+                }
+                if (!tc.name.empty())
+                {
+                    resp.tool_calls.push_back(std::move(tc));
                 }
             }
-            LOG_INFO("deepseek提出文本内容成功:{}", reply_content);
-            return reply_content;
         }
-        LOG_WARN("无法获取deepseek文本内容");
-        return "null";
+
+        resp.success = true;
+        LOG_INFO("deepseek响应解析成功 content:{} tool_calls:{}", resp.content, resp.tool_calls.size());
     }
+
     // 处理 SSE 事件流的单行解析
     void DeepSeekProvider::processSseEvent(const std::string &event, std::string &full_content, bool &streamFinish, func_stream callback)
     {

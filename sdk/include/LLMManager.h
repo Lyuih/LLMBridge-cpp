@@ -26,9 +26,10 @@ namespace chat_sdk
         bool isModelAvilable(const std::string &model_name) const;
         // 获取所有可以模型列表
         std::vector<ModelInfo> getAvailableModel();
-        // 发送消息给指定模型
-        std::string sendMessage(const std::string &model_name, const std::vector<Message> &messages,
-                                const std::map<std::string, std::string> &request_param);
+        // 发送消息给指定模型(支持工具)
+        LLMResponse sendMessage(const std::string &model_name, const std::vector<Message> &messages,
+                                const std::map<std::string, std::string> &request_param,
+                                const std::vector<ToolDefinition> &tools = {});
         // 发送消息流给指定模型
         std::string sendMessageStream(const std::string &model_name, const std::vector<Message> &messages, const std::map<std::string, std::string> &request_param,const LLMProvider::func_stream &callback);
 

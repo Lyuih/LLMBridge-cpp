@@ -68,7 +68,7 @@ namespace chat_sdk
     std::shared_ptr<Session> DataManager::getSession(const std::string &session_id) const
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        const std::string sql = "SELECT model_name,create_time,update_time FROM session WHERE session_id = ?;";
+        const std::string sql = "SELECT model_name,create_time,update_time FROM sessions WHERE session_id = ?;";
         // 编译好的 SQL 语句容器
         sqlite3_stmt *stmt = nullptr;
         // 编译（预处理）带？占位符的 SQL 语句
@@ -190,8 +190,8 @@ namespace chat_sdk
         {
             std::string session_id(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
             std::string model_name(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1)));
-            int64_t create_time(reinterpret_cast<std::time_t>(sqlite3_column_text(stmt, 2)));
-            ino64_t update_time(reinterpret_cast<std::time_t>(sqlite3_column_text(stmt, 3)));
+            std::time_t create_time(static_cast<std::time_t>(sqlite3_column_int64(stmt, 2)));
+            std::time_t update_time(static_cast<std::time_t>(sqlite3_column_int64(stmt, 3)));
 
             auto session = std::make_shared<Session>(model_name);
             session->id = session_id;

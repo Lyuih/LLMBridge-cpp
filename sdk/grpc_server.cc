@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 #include <grpcpp/grpcpp.h>
-#include "../include/llm_bridge.pb.h"
-#include "../include/llm_bridge.grpc.pb.h"
+#include "llm_bridge.pb.h"
+#include "llm_bridge.grpc.pb.h"
 #include "../include/ChatSDK.h"
 #include "../include/common.h"
 #include "../include/logger.h"
@@ -51,6 +51,12 @@ public:
                 ollama_config->model_name = config.model_name();
                 ollama_config->model_desc_ = config.model_desc();
                 ollama_config->endPoint_ = config.base_url();
+                ollama_config->provider_type = "ollama";
+                for (const auto &fb : config.fallback())
+                {
+                    ollama_config->fallback.push_back(fb);
+                }
+                ollama_config->weight = config.weight();
                 configs.push_back(ollama_config);
             }
             else if (model_type == "api")
@@ -60,6 +66,13 @@ public:
                 api_config->model_desc_ = config.model_desc();
                 api_config->endPoint_ = config.base_url();
                 api_config->api_key = config.api_key();
+                // provider_type 优先取 proto 显式字段,为空时默认走 gpt(OpenAI 兼容)
+                api_config->provider_type = config.provider_type().empty() ? "gpt" : config.provider_type();
+                for (const auto &fb : config.fallback())
+                {
+                    api_config->fallback.push_back(fb);
+                }
+                api_config->weight = config.weight();
                 configs.push_back(api_config);
             }
             else

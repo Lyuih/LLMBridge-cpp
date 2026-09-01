@@ -68,22 +68,26 @@ namespace chat_sdk
         }
         return model_infos;
     }
-    // 发送消息给指定模型
-    std::string LLMManager::sendMessage(const std::string &model_name, const std::vector<Message> &messages,
-                                        const std::map<std::string, std::string> &request_param)
+    // 发送消息给指定模型(支持工具)
+    LLMResponse LLMManager::sendMessage(const std::string &model_name, const std::vector<Message> &messages,
+                                        const std::map<std::string, std::string> &request_param,
+                                        const std::vector<ToolDefinition> &tools)
     {
+        LLMResponse resp;
         auto it = providers_.find(model_name);
         if (it == providers_.end())
         {
-            LOG_ERROR("模型未注册:{}", model_name);
-            return "";
+            resp.error = "模型未注册:" + model_name;
+            LOG_ERROR("{}", resp.error);
+            return resp;
         }
         if (!isModelAvilable(model_name))
         {
-            LOG_ERROR("{}模型不可用", model_name);
-            return "";
+            resp.error = model_name + "模型不可用";
+            LOG_ERROR("{}", resp.error);
+            return resp;
         }
-        return it->second->sendMessage(messages, request_param);
+        return it->second->sendMessage(messages, request_param, tools);
     }
     // 发送消息流给指定模型
     std::string LLMManager::sendMessageStream(const std::string &model_name, const std::vector<Message> &messages, const std::map<std::string, std::string> &request_param,const LLMProvider::func_stream &call_back)

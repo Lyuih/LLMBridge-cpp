@@ -13,9 +13,22 @@
 #include <map>
 
 #include "common.h"
+#include "Tool.h"
 
 namespace chat_sdk
 {
+    // 模型一次调用的结构化结果: 文本 + 工具调用请求 + token 用量
+    struct LLMResponse
+    {
+        std::string content;                    // 文本内容(请求工具时可能为空)
+        std::vector<ToolCall> tool_calls;       // 模型请求调用的工具列表
+        int input_tokens = 0;                   // 本次调用输入 token
+        int output_tokens = 0;                  // 本次调用输出 token
+        bool success = false;                   // 是否成功
+        std::string error;                      // 失败原因
+
+        bool hasToolCalls() const { return !tool_calls.empty(); }
+    };
 
     class LLMProvider
     {
@@ -33,9 +46,11 @@ namespace chat_sdk
         virtual std::string getModelName() const = 0;
         //获取描述信息
         virtual std::string getModelDesc() const = 0;
-        //发送消息给模型
-        virtual std::string sendMessage(const std::vector<Message>&messages,
-            const std::map<std::string,std::string>&request_param) = 0;
+        //发送消息给模型 全量
+        //tools 非空时注入工具 schema,支持 Function Calling
+        virtual LLMResponse sendMessage(const std::vector<Message>&messages,
+            const std::map<std::string,std::string>&request_param,
+            const std::vector<ToolDefinition>& tools = {}) = 0;
         //发送消息给模型 流式响应(每生成几个字符就触发回调函数)
         virtual std::string sendMessageStream(const std::vector<Message>&messages,
             const std::map<std::string,std::string>&request_param,func_stream callback) = 0;

@@ -1,45 +1,22 @@
-# 最低cmake版本
-cmake_minimum_required(VERSION 3.10)
+# LLMTest: gtest 单元测试,链接 SDK 核心库
 
-# 项目名称
-project(LLMTest)
+if(NOT DEFINED THIRD_PARTY)
+  set(THIRD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/../third_party)
+endif()
 
-# C++标准
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(GTEST_DIR ${THIRD_PARTY}/googletest-1.14.0)
 
-# 设置构建类型
-set(CMAKE_BUILD_TYPE Debug)
+# 构建内嵌 gtest
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+add_subdirectory(${GTEST_DIR} gtest_build)
 
-# 添加可执行文件
-add_executable(LLMTest testLLM.cc
-    ../sdk/src/DeepSeekProvider.cc
-    ../sdk/src/GeminiProvider.cc
-    ../sdk/src/GPTProvider.cc
-    ../sdk/src/LLMManager.cc
-    ../sdk/src/DataManager.cc
-    ../sdk/src/ChatSDK.cc
-    ../sdk/src/UUIDUtil.cc
-    ../sdk/src/OllamaLLMProvider.cc
-    ../sdk/src/SessionManager.cc ../sdk/src/logger.cc)
+# 测试可执行文件
+add_executable(LLMTest testLLM.cc)
+target_link_libraries(LLMTest PRIVATE llmbridge gtest)
 
-# 设置输出目录
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/build)
+# testLLM.cc 自带头文件,保证能找到 SDK 头
+target_include_directories(LLMTest PRIVATE ../sdk/include)
 
-# 添加头文件搜索路径
-include_directories(${PROJECT_SOURCE_DIR}/include)
-
-# 查找OpenSSL包
-find_package(OpenSSL REQUIRED)
-
-# 包含OpennSSL头文件路径
-include_directories(${OPENSSL_INCLUDE_DIR})
-
-# 添加编译定义
-target_compile_definitions(LLMTest PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
-
-# 设置库的目录
-link_directories(/usr/local/lib)
-
-# 连接库
-target_link_libraries(LLMTest fmt jsoncpp OpenSSL::SSL OpenSSL::Crypto spdlog gtest sqlite3)
+# 链接需要
+enable_testing()
+add_test(NAME llm_core_tests COMMAND LLMTest)

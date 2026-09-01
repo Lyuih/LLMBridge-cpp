@@ -12,6 +12,9 @@ lib/
 logs/
 test/logs/
 
+# --- 运行时数据库 ---
+*.db
+
 # --- IDE 配置 (VS Code) ---
 .vscode/
 !.vscode/settings.json

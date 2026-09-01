@@ -7,48 +7,108 @@
 
 namespace chat_sdk
 {
+    namespace
+    {
+        // 把 ToolDefinition 转成 Gemini 的 functionDeclaration
+        Json::Value toolToFunctionDeclaration(const ToolDefinition &def)
+        {
+            Json::Value decl;
+            decl["name"] = def.name;
+            if (!def.description.empty())
+            {
+                decl["description"] = def.description;
+            }
+            Json::Value params;
+            params["type"] = "object";
+            Json::Value props;
+            Json::Value required(Json::arrayValue);
+            for (const auto &p : def.parameters)
+            {
+                Json::Value prop;
+                prop["type"] = p.type;
+                if (!p.description.empty())
+                {
+                    prop["description"] = p.description;
+                }
+                props[p.name] = prop;
+                if (p.required)
+                {
+                    required.append(p.name);
+                }
+            }
+            if (!props.empty())
+            {
+                params["properties"] = props;
+            }
+            if (!required.empty())
+            {
+                params["required"] = required;
+            }
+            decl["parameters"] = params;
+            return decl;
+        }
+
+        // 把 JSON 字符串参数转成 Json::Value(失败时包成 {"value": ...})
+        Json::Value parseArgs(const std::string &args)
+        {
+            Json::Value value;
+            if (args.empty())
+            {
+                value["value"] = "";
+                return value;
+            }
+            Json::CharReaderBuilder builder;
+            std::string errs;
+            std::istringstream ss(args);
+            if (Json::parseFromStream(builder, ss, &value, &errs))
+            {
+                return value;
+            }
+            value["value"] = args;
+            return value;
+        }
+    }
 
     // 模型初始化
     bool GeminiProvider::initModel(const std::map<std::string, std::string> &model_config)
     {
-        // 1. 获取api_key
         auto it = model_config.find("api_key");
         if (it == model_config.end())
         {
-            // 没有
             LOG_ERROR("gemini-2.5-flash-lite获取api_key失败!");
             return false;
         }
         api_key_ = it->second;
-        // 2.获取base url
         it = model_config.find("base_url");
         if (it == model_config.end())
         {
-            // 没有
             LOG_ERROR("gemini-2.5-flash-lite获取base_url失败!");
             return false;
         }
         endPoint_ = it->second;
-        // 3.标记初始化成功
+        // 可选: 配置自定义模型名
+        it = model_config.find("model_name");
+        if (it != model_config.end() && !it->second.empty())
+        {
+            model_name_ = it->second;
+        }
         isAvailable_ = true;
-        LOG_INFO("成功 success");
         LOG_INFO("gemini-2.5-flash-lite模型初始化成功{}", endPoint_);
         return true;
     }
 
-    // 发送消息给模型
-    std::string GeminiProvider::sendMessage(const std::vector<Message> &messages,
-                                            const std::map<std::string, std::string> &request_param)
+    // 发送消息给模型 全量返回(支持工具)
+    LLMResponse GeminiProvider::sendMessage(const std::vector<Message> &messages,
+                                            const std::map<std::string, std::string> &request_param,
+                                            const std::vector<ToolDefinition> &tools)
     {
-        // 1.检查模型是否有效
-
+        LLMResponse resp;
         if (!isAvailable())
         {
-            LOG_ERROR("gemini-2.5-flash-lite模型不可用");
-            return "";
+            resp.error = "gemini模型不可用";
+            LOG_ERROR("{}", resp.error);
+            return resp;
         }
-
-        // 2.获取采用温度和最大tokens
         double temperature = 0.7;
         int max_tokens = 2048;
         if (request_param.find("temperature") != request_param.end())
@@ -59,52 +119,47 @@ namespace chat_sdk
         {
             max_tokens = std::stoi(request_param.at("max_tokens"));
         }
-        std::string json_msg = buildRequestBody(messages, temperature, max_tokens, false);
+        std::string json_msg = buildRequestBody(messages, temperature, max_tokens, false, tools);
 
-        // 创建http client
         httplib::Client client(endPoint_);
         client.set_connection_timeout(30, 0);
         client.set_read_timeout(60, 0);
         client.set_proxy("127.0.0.1", 7897);
-        // 请求头
         httplib::Headers headers = {
             {"x-goog-api-key", api_key_}};
-        // 发送post请求
         auto response = client.Post(
-            "/v1beta/models/gemini-2.5-flash-lite:generateContent",
+            "/v1beta/models/" + getModelName() + ":generateContent",
             headers,
             json_msg,
             "application/json");
         if (!response)
         {
-            LOG_ERROR("连接Gemini API失败,请检查网络和ssl");
-            return "";
+            resp.error = "连接Gemini API失败,请检查网络和ssl";
+            LOG_ERROR("{}", resp.error);
+            return resp;
         }
-        LOG_DEBUG("Gemini API response status {}", response->status);
-        LOG_DEBUG("Gemini API response body {}", response->body);
-
-        // 检查响应
         if (response->status != 200)
         {
-            LOG_ERROR("Gemini API 返回非200状态 {} - {}", response->status, response->body);
-            return "";
+            resp.error = "Gemini API 返回非200状态 " + std::to_string(response->status) + " - " + response->body;
+            LOG_ERROR("{}", resp.error);
+            return resp;
         }
-        return extractContentFromJson(response->body);
+        parseResponse(response->body, resp);
+        return resp;
     }
+
     // 发送消息给模型 流式响应(每生成几个字符就触发回调函数)
     std::string GeminiProvider::sendMessageStream(const std::vector<Message> &messages,
                                                   const std::map<std::string, std::string> &request_param, func_stream callback)
     {
         using namespace json_fields;
 
-        // 1. 检查模型可用性
         if (!isAvailable())
         {
             LOG_ERROR("gemini-2.5-flash-lite模型不可用");
             return "";
         }
 
-        // 2. 获取请求参数
         double temperature = 0.7;
         int max_tokens = 2048;
         if (request_param.find("temperature") != request_param.end())
@@ -115,21 +170,18 @@ namespace chat_sdk
         {
             max_tokens = std::stoi(request_param.at("max_tokens"));
         }
-        std::string json_msg = buildRequestBody(messages, temperature, max_tokens, true);
+        std::string json_msg = buildRequestBody(messages, temperature, max_tokens, true, {});
 
-        // 3. 创建HTTP客户端并配置
         httplib::Client client(endPoint_);
         client.set_connection_timeout(30, 0);
         client.set_read_timeout(60, 0);
         client.set_proxy("127.0.0.1", 7897);
 
-        // 4. 配置请求头（修复：使用x-goog-api-key代替Authorization Bearer）
         httplib::Headers headers = {
             {"x-goog-api-key", api_key_},
             {"Accept", "text/event-stream"},
             {"Content-Type", "application/json"}};
 
-        // 5. 流式处理变量
         std::string buffer;
         bool gotError = false;
         std::string errorMsg;
@@ -137,16 +189,12 @@ namespace chat_sdk
         bool streamFinish = false;
         std::string full_content;
 
-        // 6. 创建请求对象（修复：使用正确的流式端点）
         httplib::Request req;
         req.method = "POST";
-        req.path = "/v1beta/models/" + getModelName() + ":streamGenerateContent?alt=sse"; // 原生Gemini流式端点
-        // 如果需要使用OpenAI兼容模式，请注释上面一行并取消注释下面一行
-        // req.path = "/v1beta/openai/chat/completions";
+        req.path = "/v1beta/models/" + getModelName() + ":streamGenerateContent?alt=sse";
         req.headers = headers;
         req.body = json_msg;
 
-        // 7. 响应处理器（处理HTTP状态码）
         req.response_handler = [&](const httplib::Response &response)
         {
             statusCode = response.status;
@@ -159,7 +207,6 @@ namespace chat_sdk
             return true;
         };
 
-        // 8. 内容接收器（处理流式数据）
         req.content_receiver = [&](const char *data, size_t len, uint64_t offset, uint64_t totalLength)
         {
             if (gotError)
@@ -203,7 +250,6 @@ namespace chat_sdk
             return true;
         };
 
-        // 9. 发送请求并处理结果
         auto res = client.send(req);
         if (!res)
         {
@@ -228,21 +274,25 @@ namespace chat_sdk
     }
 
     // 负责将 Message 列表和参数转为 JSON 字符串
-    std::string GeminiProvider::buildRequestBody(const std::vector<Message> &messages, double temp, int max_tokens, bool stream)
+    std::string GeminiProvider::buildRequestBody(const std::vector<Message> &messages, double temp, int max_tokens, bool stream,
+                                                 const std::vector<ToolDefinition> &tools)
     {
         using namespace json_fields;
-        Json::Value contents; // Gemini 对话主体
+        Json::Value contents;
         for (const auto &message : messages)
         {
             Json::Value msg;
-            // 1. 角色：user / model（Gemini 固定格式）
+            // 角色映射: assistant -> model, system -> 跳过, tool -> function
             if (message.role == "assistant")
             {
                 msg["role"] = "model";
             }
+            else if (message.role == "tool")
+            {
+                msg["role"] = "function";
+            }
             else if (message.role == "system")
             {
-                // Gemini 的 system 指令不在 contents 里设置，直接跳过或者记录
                 continue;
             }
             else
@@ -250,19 +300,60 @@ namespace chat_sdk
                 msg["role"] = message.role;
             }
 
-            // 2. 内容：必须包裹在 parts -> text 中（官方强制格式）
-            Json::Value part;
-            // 避免空字符串报错，给个空格垫底
-            part["text"] = message.content.empty() ? " " : message.content;
-            Json::Value parts;
-            parts.append(part);
+            Json::Value parts(Json::arrayValue);
+            // 工具结果回填
+            if (message.role == "tool")
+            {
+                Json::Value fr;
+                std::string tool_name = message.tool_name.empty() ? message.tool_call_id : message.tool_name;
+                fr["name"] = tool_name;
+                Json::Value response;
+                response["result"] = message.content.empty() ? " " : message.content;
+                fr["response"] = response;
+                Json::Value part;
+                part["functionResponse"] = fr;
+                parts.append(part);
+            }
+            // 助手请求工具调用
+            else if (!message.tool_calls.empty())
+            {
+                for (const auto &tc : message.tool_calls)
+                {
+                    Json::Value fc;
+                    fc["name"] = tc.name;
+                    fc["args"] = parseArgs(tc.arguments);
+                    Json::Value part;
+                    part["functionCall"] = fc;
+                    parts.append(part);
+                }
+            }
+            else
+            {
+                Json::Value part;
+                part["text"] = message.content.empty() ? " " : message.content;
+                parts.append(part);
+            }
             msg["parts"] = parts;
-
             contents.append(msg);
         }
 
         Json::Value request_body;
         request_body["contents"] = contents;
+
+        // 注入工具 schema
+        if (!tools.empty())
+        {
+            Json::Value decls(Json::arrayValue);
+            for (const auto &def : tools)
+            {
+                decls.append(toolToFunctionDeclaration(def));
+            }
+            Json::Value tool;
+            tool["functionDeclarations"] = decls;
+            Json::Value tools_json(Json::arrayValue);
+            tools_json.append(tool);
+            request_body["tools"] = tools_json;
+        }
 
         Json::Value system_instruction;
         Json::Value system_part;
@@ -284,45 +375,74 @@ namespace chat_sdk
         return json_string;
     }
 
-    // 负责从返回的 JSON 中提取文本内容
-    std::string GeminiProvider::extractContentFromJson(const std::string &response_body)
+    // 从响应 JSON 解析内容 / 工具调用 / token 用量
+    void GeminiProvider::parseResponse(const std::string &response_body, LLMResponse &resp)
     {
         using namespace json_fields;
 
-        Json::Value response_json;
+        Json::Value json;
         Json::CharReaderBuilder readBuilder;
         std::string errs;
         std::istringstream json_stream(response_body);
-        if (!Json::parseFromStream(readBuilder, json_stream, &response_json, &errs))
+        if (!Json::parseFromStream(readBuilder, json_stream, &json, &errs))
         {
-            LOG_ERROR("反序列化失败:{}", errs);
-            return "";
+            resp.error = "反序列化失败:" + errs;
+            LOG_ERROR("{}", resp.error);
+            return;
         }
 
-        // 1. 检查 candidates 数组是否存在且不为空
-        if (response_json.isMember("candidates") &&
-            response_json["candidates"].isArray() &&
-            !response_json["candidates"].empty())
+        // token 用量
+        if (json.isMember("usageMetadata") && json["usageMetadata"].isObject())
         {
-            // 2. 获取第一个候选结果（Gemini 默认只返回一个）
-            const Json::Value &candidate = response_json["candidates"][0];
+            resp.input_tokens = json["usageMetadata"].get("promptTokenCount", 0).asInt();
+            resp.output_tokens = json["usageMetadata"].get("candidatesTokenCount", 0).asInt();
+        }
 
-            // 3. 检查 content 和 parts 字段是否存在
-            if (candidate.isMember("content") &&
-                candidate["content"].isMember("parts") &&
-                candidate["content"]["parts"].isArray() &&
-                !candidate["content"]["parts"].empty())
+        if (!json.isMember("candidates") || !json["candidates"].isArray() || json["candidates"].empty())
+        {
+            resp.error = "响应缺少 candidates";
+            LOG_WARN("{}", resp.error);
+            return;
+        }
+
+        const Json::Value &candidate = json["candidates"][0];
+        if (!candidate.isMember("content") || !candidate["content"].isMember("parts") ||
+            !candidate["content"]["parts"].isArray())
+        {
+            resp.error = "响应缺少 content.parts";
+            LOG_WARN("{}", resp.error);
+            return;
+        }
+
+        int tool_index = 0;
+        for (const auto &part : candidate["content"]["parts"])
+        {
+            if (part.isMember("text"))
             {
-                // 4. 提取 text 内容
-                std::string reply_content = candidate["content"]["parts"][0]["text"].asString();
-                LOG_INFO("Gemini提取文本内容成功:{}", reply_content);
-                return reply_content;
+                resp.content += part["text"].asString();
+            }
+            else if (part.isMember("functionCall") && part["functionCall"].isObject())
+            {
+                ToolCall tc;
+                const Json::Value &fc = part["functionCall"];
+                tc.name = fc.get("name", "").asString();
+                // args 为对象,序列化成 JSON 字符串
+                if (fc.isMember("args") && fc["args"].isObject())
+                {
+                    Json::StreamWriterBuilder w;
+                    tc.arguments = Json::writeString(w, fc["args"]);
+                }
+                // Gemini 无调用 id,合成一个
+                tc.id = "call_gemini_" + tc.name + "_" + std::to_string(tool_index++);
+                if (!tc.name.empty())
+                {
+                    resp.tool_calls.push_back(std::move(tc));
+                }
             }
         }
 
-        // 错误日志（保留原有逻辑）
-        LOG_WARN("无法获取Gemini文本内容");
-        return "null";
+        resp.success = true;
+        LOG_INFO("Gemini响应解析成功 content:{} tool_calls:{}", resp.content, resp.tool_calls.size());
     }
 
     // 处理 SSE 事件流的单行解析
@@ -336,25 +456,23 @@ namespace chat_sdk
         }
 
         std::string json_str = event;
-        // 兼容带 "data: " 前缀的 sse 格式
         if (json_str.compare(0, 6, "data: ") == 0)
         {
             json_str = json_str.substr(6);
         }
         else if (json_str.find("\"candidates\"") == std::string::npos)
         {
-            // 有时候返回头部行不需要处理
             return;
         }
 
-        // 去除可能的首尾空白字符串
         json_str.erase(0, json_str.find_first_not_of(" \r\n\t"));
         json_str.erase(json_str.find_last_not_of(" \r\n\t") + 1);
 
         if (json_str.empty())
+        {
             return;
+        }
 
-        // 反序列化JSON数据
         Json::Value chunk;
         Json::CharReaderBuilder readBuilder;
         std::string errs;
@@ -365,14 +483,12 @@ namespace chat_sdk
             return;
         }
 
-        // 解析Gemini原生格式响应
         if (chunk.isMember("candidates") &&
             chunk["candidates"].isArray() &&
             !chunk["candidates"].empty())
         {
             const Json::Value &candidate = chunk["candidates"][0];
 
-            // 提取文本内容
             if (candidate.isMember("content") &&
                 candidate["content"].isMember("parts") &&
                 candidate["content"]["parts"].isArray() &&
@@ -387,7 +503,6 @@ namespace chat_sdk
                 }
             }
 
-            // 官方流结束标志
             if (candidate.isMember("finishReason"))
             {
                 std::string finish_reason = candidate["finishReason"].asString();
@@ -401,7 +516,6 @@ namespace chat_sdk
             }
         }
 
-        // 错误处理
         if (chunk.isMember("error"))
         {
             std::string error_msg = chunk["error"]["message"].asString();
