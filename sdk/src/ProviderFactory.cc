@@ -1,9 +1,8 @@
 #include <mutex>
 #include "../include/ProviderFactory.h"
-#include "../include/DeepSeekProvider.h"
-#include "../include/GPTProvider.h"
+#include "../include/OpenAICompatProvider.h"
+#include "../include/ClaudeProvider.h"
 #include "../include/GeminiProvider.h"
-#include "../include/OllamaLLMProvider.h"
 #include "../include/logger.h"
 
 namespace chat_sdk
@@ -59,16 +58,18 @@ namespace chat_sdk
         return types;
     }
 
-    // 注册内置 provider。用 once_flag 保证幂等,避免 ChatSDK 被多次初始化时重复注册。
+    // 注册内置协议族。用 once_flag 保证幂等,避免 ChatSDK 被多次初始化时重复注册。
+    // 三大协议族: openai(OpenAI 兼容,DeepSeek/Ollama/Qwen 等都走这一套) / claude / gemini
+    // 其他模型一律通过这三者之一 + base_url/model_name 配置接入,无需新增 provider。
     void registerBuiltinProviders()
     {
         static std::once_flag flag;
         std::call_once(flag, []() {
             auto &factory = ProviderFactory::instance();
-            factory.registerProvider("deepseek", []() { return std::make_unique<DeepSeekProvider>(); });
-            factory.registerProvider("gpt", []() { return std::make_unique<GPTProvider>(); });
+            factory.registerProvider("openai", []() { return std::make_unique<OpenAICompatProvider>(); });
+            factory.registerProvider("gpt", []() { return std::make_unique<OpenAICompatProvider>(); }); // 兼容别名
+            factory.registerProvider("claude", []() { return std::make_unique<ClaudeProvider>(); });
             factory.registerProvider("gemini", []() { return std::make_unique<GeminiProvider>(); });
-            factory.registerProvider("ollama", []() { return std::make_unique<OllamaLLMProvider>(); });
         });
     }
 }

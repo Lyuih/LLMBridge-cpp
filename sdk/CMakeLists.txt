@@ -25,15 +25,14 @@ target_compile_definitions(fmt PUBLIC FMT_HEADER_ONLY=0)
 
 # ---------- SDK 核心库 ----------
 add_library(llmbridge STATIC
-    src/DeepSeekProvider.cc
+    src/ClaudeProvider.cc
     src/GeminiProvider.cc
-    src/GPTProvider.cc
+    src/OpenAICompatProvider.cc
     src/ProviderFactory.cc
     src/ConfigLoader.cc
     src/LLMManager.cc
     src/DataManager.cc
     src/ChatSDK.cc
-    src/OllamaLLMProvider.cc
     src/SessionManager.cc
     src/logger.cc
     src/UUIDUtil.cc

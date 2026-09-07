@@ -57,9 +57,7 @@ namespace chat_sdk
         void registerAllProvider(const std::vector<std::shared_ptr<Config>> &configs);
         // 初始化所有模型提供者
         void initProviders(const std::vector<std::shared_ptr<Config>> &configs);
-        // 初始化模型提供者 通过ollama
-        bool initOllamaModelProviders(const std::string &modelName, const std::shared_ptr<OllamaConfig> &ollamaConfig);
-        // 初始化模型提供者 - API模型提供者
+        // 初始化模型提供者(三大协议族统一走 ApiConfig)
         bool initAPIModelProviders(const std::string &model_name, const std::shared_ptr<ApiConfig> &api_config);
 
     private:

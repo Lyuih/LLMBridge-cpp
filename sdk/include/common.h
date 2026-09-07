@@ -7,11 +7,11 @@
 // 封装公共配置和描述信息，如：模型名称、温度值、最大tokens数、apikey等
 
 /*
-curl https://api.deepseek.com/chat/completions \
+curl https://api.openai.com/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${DEEPSEEK_API_KEY}" \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
   -d '{
-        "model": "deepseek-chat",
+        "model": "gpt-4o-mini",
         "messages": [
           {"role": "system", "content": "You are a helpful assistant."},
           {"role": "user", "content": "Hello!"}
@@ -83,7 +83,7 @@ namespace chat_sdk
     struct Config
     {
         std::string model_name;       // 模型名(会话/路由使用的外部名字)
-        std::string provider_type;    // provider 类型: "deepseek" / "gpt" / "gemini" / "ollama" 等,驱动工厂创建
+        std::string provider_type;    // 协议族类型: "openai" / "claude" / "gemini"(可注册自定义类型),驱动工厂创建
         double temperature = 0.7;     // 采样温度
         int max_tokens = 2048;        // 最大token数
         int weight = 1;               // 路由权重,同模型名多provider时按权重分配流量(0 表示不参与路由)
@@ -97,13 +97,6 @@ namespace chat_sdk
     struct ApiConfig : public Config
     {
         std::string api_key;
-        std::string model_desc_;
-        std::string endPoint_;
-    };
-
-    // ollama 接入本地模型
-    struct OllamaConfig : public Config
-    {
         std::string model_desc_;
         std::string endPoint_;
     };

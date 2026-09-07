@@ -44,41 +44,20 @@ public:
             {
                 return Status(StatusCode::INVALID_ARGUMENT, "model_name为空,列表下标:" + std::to_string(i));
             }
-            const std::string model_type = config.model_type();
-            if (model_type == "ollama")
+            // 三大协议族统一走 ApiConfig,模型差异由 base_url/model_name/provider_type 消化
+            auto api_config = std::make_shared<chat_sdk::ApiConfig>();
+            api_config->model_name = config.model_name();
+            api_config->model_desc_ = config.model_desc();
+            api_config->endPoint_ = config.base_url();
+            api_config->api_key = config.api_key();
+            // provider_type 优先取 proto 显式字段,为空时默认走 openai(OpenAI 兼容协议族)
+            api_config->provider_type = config.provider_type().empty() ? "openai" : config.provider_type();
+            for (const auto &fb : config.fallback())
             {
-                auto ollama_config = std::make_shared<chat_sdk::OllamaConfig>();
-                ollama_config->model_name = config.model_name();
-                ollama_config->model_desc_ = config.model_desc();
-                ollama_config->endPoint_ = config.base_url();
-                ollama_config->provider_type = "ollama";
-                for (const auto &fb : config.fallback())
-                {
-                    ollama_config->fallback.push_back(fb);
-                }
-                ollama_config->weight = config.weight();
-                configs.push_back(ollama_config);
+                api_config->fallback.push_back(fb);
             }
-            else if (model_type == "api")
-            {
-                auto api_config = std::make_shared<chat_sdk::ApiConfig>();
-                api_config->model_name = config.model_name();
-                api_config->model_desc_ = config.model_desc();
-                api_config->endPoint_ = config.base_url();
-                api_config->api_key = config.api_key();
-                // provider_type 优先取 proto 显式字段,为空时默认走 gpt(OpenAI 兼容)
-                api_config->provider_type = config.provider_type().empty() ? "gpt" : config.provider_type();
-                for (const auto &fb : config.fallback())
-                {
-                    api_config->fallback.push_back(fb);
-                }
-                api_config->weight = config.weight();
-                configs.push_back(api_config);
-            }
-            else
-            {
-                return Status(StatusCode::INVALID_ARGUMENT, "未知类型,列表下标:" + std::to_string(i));
-            }
+            api_config->weight = config.weight();
+            configs.push_back(api_config);
             LOG_INFO("初始化 model:{}", config.model_name());
         }
         bool flag = llm_bridge_->initModels(configs);

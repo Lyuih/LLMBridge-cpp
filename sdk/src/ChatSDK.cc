@@ -1,10 +1,6 @@
 #include <algorithm>
 #include <chrono>
 #include "../include/ChatSDK.h"
-#include "../include/DeepSeekProvider.h"
-#include "../include/GPTProvider.h"
-#include "../include/GeminiProvider.h"
-#include "../include/OllamaLLMProvider.h"
 #include "../include/ProviderFactory.h"
 #include "../include/ConfigLoader.h"
 #include "../include/logger.h"
@@ -337,21 +333,15 @@ namespace chat_sdk
             LOG_INFO("{} 注册成功(type:{})", config->model_name, config->provider_type);
         }
     }
-    // 初始化所有模型提供者 —— 按 provider_type 分流,任意类型均可接入
+    // 初始化所有模型提供者 —— 三大协议族统一走 ApiConfig,按 provider_type 驱动工厂创建
     void ChatSDK::initProviders(const std::vector<std::shared_ptr<Config>> &configs)
     {
         for (const auto &config : configs)
         {
-            if (config->provider_type == "ollama")
-            {
-                initOllamaModelProviders(config->model_name, std::dynamic_pointer_cast<OllamaConfig>(config));
-            }
-            else
-            {
-                initAPIModelProviders(config->model_name, std::dynamic_pointer_cast<ApiConfig>(config));
-            }
+            initAPIModelProviders(config->model_name, std::dynamic_pointer_cast<ApiConfig>(config));
         }
     }
+
     bool ChatSDK::initAPIModelProviders(const std::string &model_name, const std::shared_ptr<ApiConfig> &api_config)
     {
         if (model_name.empty())
@@ -360,9 +350,10 @@ namespace chat_sdk
             return false;
         }
 
-        if (!api_config || api_config->api_key.empty())
+        // api_key 可为空(本地 Ollama/vLLM 等无鉴权端点也走 OpenAI 兼容协议,不要求必须有 key)
+        if (!api_config || api_config->endPoint_.empty())
         {
-            LOG_ERROR("api_key为空");
+            LOG_ERROR("base_url为空");
             return false;
         }
 
@@ -371,6 +362,10 @@ namespace chat_sdk
         model_params["api_key"] = api_config->api_key;
         model_params["base_url"] = api_config->endPoint_;
         model_params["model_name"] = model_name; // 让 provider 的 getModelName() 与外部模型名一致
+        if (!api_config->model_desc_.empty())
+        {
+            model_params["model_desc"] = api_config->model_desc_;
+        }
         if (!llmManager_.initModel(model_name, model_params))
         {
             return false;
@@ -378,40 +373,6 @@ namespace chat_sdk
         // 模型配置
         configs_[model_name] = api_config;
         LOG_INFO("模型 {} 初始化成功", model_name);
-        return true;
-    }
-    bool ChatSDK::initOllamaModelProviders(const std::string &model_name, const std::shared_ptr<OllamaConfig> &ollama_config)
-    {
-        if (model_name.empty())
-        {
-            LOG_ERROR("model_name为空");
-            return false;
-        }
-
-        if (!ollama_config || ollama_config->endPoint_.empty())
-        {
-            LOG_ERROR("api_key为空");
-            return false;
-        }
-
-        // // 初始化模型提供者
-        // if (llmManager_.isModelAvailable(modelName))
-        // {
-        //     INFO("ChatSDK::initAPIModelProviders: model {} is already available", modelName);
-        //     return true;
-        // }
-
-        // 初始化模型
-        std::map<std::string, std::string> model_params;
-        model_params["base_url"] = ollama_config->endPoint_;
-        model_params["model_name"] = ollama_config->model_name;
-        model_params["model_desc"] = ollama_config->model_desc_;
-        if (!llmManager_.initModel(model_name, model_params))
-        {
-            return false;
-        }
-        configs_[model_name] = ollama_config;
-        LOG_INFO("模型{}初始化成功", model_name);
         return true;
     }
 

@@ -1,14 +1,22 @@
 /**
- * @file OllamaLLMProvider.h
+ * @file OpenAICompatProvider.h
  * @author yui
  */
-#ifndef OLLAMALLMPROVIDER_H
-#define OLLAMALLMPROVIDER_H
+
+// OpenAI Chat Completions 兼容 provider (三大协议族之一)
+// 适配所有走 OpenAI 兼容端点的模型: gpt / deepseek / qwen(kimi/glm 等国内模型) / Ollama(/v1) / vLLM ...
+// 协议族内部的差异全部由配置消化: base_url 指到哪、model_name 叫什么,无需新增代码
+// api_key 可空(本地 Ollama / vLLM 等无鉴权端点)
+// 支持 Function Calling: 注入 tools,解析 tool_calls
+
+#ifndef OPENAI_COMPAT_PROVIDER_H
+#define OPENAI_COMPAT_PROVIDER_H
 
 #include "LLMProvider.h"
+
 namespace chat_sdk
 {
-    class OllamaLLMProvider : public LLMProvider
+    class OpenAICompatProvider : public LLMProvider
     {
     public:
         // 模型初始化
@@ -40,14 +48,14 @@ namespace chat_sdk
         // 负责将 Message 列表和参数转为 JSON 字符串(含工具注入)
         std::string buildRequestBody(const std::vector<Message> &messages, double temp, int max_tokens, bool stream,
                                      const std::vector<ToolDefinition> &tools);
-        // 从响应 JSON 解析内容 / 工具调用 / token 用量
+        // 从响应 JSON 解析内容 / 工具调用 / token 用量,填充到 resp
         void parseResponse(const std::string &response_body, LLMResponse &resp);
         // 处理 SSE 事件流的单行解析
         void processSseEvent(const std::string &event, std::string &full_content, bool &streamFinish, func_stream callback);
 
     private:
-        std::string model_name_;
-        std::string model_desc_;
+        std::string model_name_ = "gpt-4o-mini"; // 默认模型,可通过配置覆盖
+        std::string model_desc_ = "OpenAI 兼容通用模型,可通过配置指向任意 OpenAI 兼容端点";
     };
 }
 

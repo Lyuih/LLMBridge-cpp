@@ -40,22 +40,11 @@ namespace chat_sdk
                 return nullptr;
             }
 
-            std::shared_ptr<Config> config;
-            if (provider == "ollama")
-            {
-                auto c = std::make_shared<OllamaConfig>();
-                c->model_desc_ = optString(item, "desc");
-                c->endPoint_ = optString(item, "base_url");
-                config = c;
-            }
-            else
-            {
-                auto c = std::make_shared<ApiConfig>();
-                c->api_key = optString(item, "api_key");
-                c->model_desc_ = optString(item, "desc");
-                c->endPoint_ = optString(item, "base_url");
-                config = c;
-            }
+            // 三大协议族统一用 ApiConfig: base_url + api_key + model_name 消化一切模型差异
+            auto config = std::make_shared<ApiConfig>();
+            config->api_key = optString(item, "api_key");
+            config->model_desc_ = optString(item, "desc");
+            config->endPoint_ = optString(item, "base_url");
 
             config->model_name = name;
             config->provider_type = provider;

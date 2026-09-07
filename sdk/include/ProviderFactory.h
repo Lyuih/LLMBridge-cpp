@@ -41,7 +41,8 @@ namespace chat_sdk
         std::map<std::string, Creator> creators_;
     };
 
-    // 注册内置 provider: "deepseek" / "gpt" / "gemini" / "ollama"
+    // 注册内置协议族: "openai" / "gpt"(别名) / "claude" / "gemini"
+    // 模型差异(deepseek/ollama/qwen...)统一由配置消化,不再按模型注册 provider
     // 在 ChatSDK 首次初始化前调用一次即可(幂等)
     void registerBuiltinProviders();
 }

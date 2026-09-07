@@ -1,7 +1,7 @@
 #include <sstream>
 #include <json/json.h>
 #include "../include/httplib.h"
-#include "../include/DeepSeekProvider.h"
+#include "../include/OpenAICompatProvider.h"
 #include "../include/logger.h"
 #include "../include/fields.h"
 
@@ -18,6 +18,7 @@ namespace chat_sdk
             {
                 func["description"] = def.description;
             }
+            // parameters: JSON Schema 子集
             Json::Value params;
             params["type"] = "object";
             Json::Value props;
@@ -50,46 +51,49 @@ namespace chat_sdk
     }
 
     // 模型初始化
-    bool DeepSeekProvider::initModel(const std::map<std::string, std::string> &model_config)
+    bool OpenAICompatProvider::initModel(const std::map<std::string, std::string> &model_config)
     {
-        // 1. 获取api_key
-        auto it = model_config.find("api_key");
-        if (it == model_config.end())
+        // 1. 获取 base url(必填)
+        auto it = model_config.find("base_url");
+        if (it == model_config.end() || it->second.empty())
         {
-            LOG_ERROR("deepseek获取api_key失败!");
-            return false;
-        }
-        api_key_ = it->second;
-        // 2.获取base url
-        it = model_config.find("base_url");
-        if (it == model_config.end())
-        {
-            LOG_ERROR("deepseek获取base_url失败!");
+            LOG_ERROR("openai 兼容模型获取base_url失败!");
             return false;
         }
         endPoint_ = it->second;
-        // 3.可选: 配置自定义模型名(默认 deepseek-chat)
+        // 2. 可选: api_key(本地 Ollama/vLLM 等无鉴权端点可不配置)
+        it = model_config.find("api_key");
+        if (it != model_config.end())
+        {
+            api_key_ = it->second;
+        }
+        // 3. 可选: 配置自定义模型名(默认 gpt-4o-mini)
         it = model_config.find("model_name");
         if (it != model_config.end() && !it->second.empty())
         {
             model_name_ = it->second;
         }
-        // 4.标记初始化成功
+        // 4. 可选: 模型描述
+        it = model_config.find("model_desc");
+        if (it != model_config.end() && !it->second.empty())
+        {
+            model_desc_ = it->second;
+        }
+        // 5. 标记初始化成功
         isAvailable_ = true;
-        LOG_INFO("成功 success");
-        LOG_INFO("deepseek模型初始化成功{}", endPoint_);
+        LOG_INFO("openai 兼容模型初始化成功 {} model:{}", endPoint_, model_name_);
         return true;
     }
 
     // 发送消息给模型 全量返回(支持工具)
-    LLMResponse DeepSeekProvider::sendMessage(const std::vector<Message> &messages,
-                                              const std::map<std::string, std::string> &request_param,
-                                              const std::vector<ToolDefinition> &tools)
+    LLMResponse OpenAICompatProvider::sendMessage(const std::vector<Message> &messages,
+                                                  const std::map<std::string, std::string> &request_param,
+                                                  const std::vector<ToolDefinition> &tools)
     {
         LLMResponse resp;
         if (!isAvailable())
         {
-            resp.error = "deepseek模型失效";
+            resp.error = "openai 兼容模型失效";
             LOG_ERROR("{}", resp.error);
             return resp;
         }
@@ -109,18 +113,22 @@ namespace chat_sdk
         client.set_connection_timeout(30, 0);
         client.set_read_timeout(60, 0);
         httplib::Headers headers = {
-            {"Authorization", "Bearer " + api_key_},
             {"Content-Type", "application/json"}};
+        // 本地无鉴权端点不携带 Bearer
+        if (!api_key_.empty())
+        {
+            headers.emplace("Authorization", "Bearer " + api_key_);
+        }
         auto response = client.Post("/v1/chat/completions", headers, json_msg, "application/json");
         if (!response)
         {
-            resp.error = "连接deepseek API失败,请检查网络和ssl";
+            resp.error = "连接 OpenAI 兼容 API 失败,请检查网络和 ssl";
             LOG_ERROR("{}", resp.error);
             return resp;
         }
         if (response->status != 200)
         {
-            resp.error = "deepseek API 返回非200状态 " + std::to_string(response->status) + " - " + response->body;
+            resp.error = "OpenAI 兼容 API 返回非200状态 " + std::to_string(response->status) + " - " + response->body;
             LOG_ERROR("{}", resp.error);
             return resp;
         }
@@ -129,13 +137,13 @@ namespace chat_sdk
     }
 
     // 发送消息给模型 流式响应(每生成几个字符就触发回调函数)
-    std::string DeepSeekProvider::sendMessageStream(const std::vector<Message> &messages,
-                                                    const std::map<std::string, std::string> &request_param, func_stream callback)
+    std::string OpenAICompatProvider::sendMessageStream(const std::vector<Message> &messages,
+                                                        const std::map<std::string, std::string> &request_param, func_stream callback)
     {
-        LOG_DEBUG("流式响应");
+        LOG_DEBUG("openai 兼容流式响应");
         if (!isAvailable())
         {
-            LOG_ERROR("deepseek模型失效");
+            LOG_ERROR("openai 兼容模型失效");
             return "";
         }
         double temperature = 0.7;
@@ -155,9 +163,12 @@ namespace chat_sdk
         client.set_connection_timeout(30, 0);
         client.set_read_timeout(60, 0);
         httplib::Headers headers = {
-            {"Authorization", "Bearer " + api_key_},
             {"Accept", "text/event-stream"},
             {"Content-Type", "application/json"}};
+        if (!api_key_.empty())
+        {
+            headers.emplace("Authorization", "Bearer " + api_key_);
+        }
 
         std::string buffer;
         bool gotError = false;
@@ -223,8 +234,8 @@ namespace chat_sdk
     }
 
     // 负责将 Message 列表和参数转为 JSON 字符串
-    std::string DeepSeekProvider::buildRequestBody(const std::vector<Message> &messages, double temp, int max_tokens, bool stream,
-                                                   const std::vector<ToolDefinition> &tools)
+    std::string OpenAICompatProvider::buildRequestBody(const std::vector<Message> &messages, double temp, int max_tokens, bool stream,
+                                                       const std::vector<ToolDefinition> &tools)
     {
         using namespace json_fields;
         Json::Value msg_array;
@@ -232,11 +243,13 @@ namespace chat_sdk
         {
             Json::Value msg;
             msg[ROLE] = message.role;
+            // tool 角色消息: 关联 tool_call_id
             if (message.role == "tool")
             {
                 msg["tool_call_id"] = message.tool_call_id;
             }
             msg[CONTENT] = message.content.empty() ? "" : message.content;
+            // assistant 请求工具时携带 tool_calls
             if (!message.tool_calls.empty())
             {
                 Json::Value calls(Json::arrayValue);
@@ -261,6 +274,7 @@ namespace chat_sdk
         request_body[TEMPERATURE] = temp;
         request_body[MAX_TOKENS] = max_tokens;
         request_body[STREAM] = stream;
+        // 注入工具 schema
         if (!tools.empty())
         {
             Json::Value tools_json(Json::arrayValue);
@@ -275,12 +289,12 @@ namespace chat_sdk
         }
         Json::StreamWriterBuilder writer;
         std::string json_string = Json::writeString(writer, request_body);
-        LOG_DEBUG("deepseek请求数据序列化成功:{}", json_string);
+        LOG_DEBUG("openai兼容请求数据序列化成功:{}", json_string);
         return json_string;
     }
 
     // 从响应 JSON 解析内容 / 工具调用 / token 用量
-    void DeepSeekProvider::parseResponse(const std::string &response_body, LLMResponse &resp)
+    void OpenAICompatProvider::parseResponse(const std::string &response_body, LLMResponse &resp)
     {
         using namespace json_fields;
 
@@ -295,6 +309,7 @@ namespace chat_sdk
             return;
         }
 
+        // token 用量
         if (json.isMember("usage") && json["usage"].isObject())
         {
             resp.input_tokens = json["usage"].get("prompt_tokens", 0).asInt();
@@ -311,6 +326,7 @@ namespace chat_sdk
         const Json::Value &message = json[CHOICES][0][MESSAGE];
         resp.content = message.get(CONTENT, "").asString();
 
+        // 解析工具调用
         if (message.isMember("tool_calls") && message["tool_calls"].isArray())
         {
             for (const auto &call : message["tool_calls"])
@@ -330,11 +346,11 @@ namespace chat_sdk
         }
 
         resp.success = true;
-        LOG_INFO("deepseek响应解析成功 content:{} tool_calls:{}", resp.content, resp.tool_calls.size());
+        LOG_INFO("openai兼容响应解析成功 content:{} tool_calls:{}", resp.content, resp.tool_calls.size());
     }
 
     // 处理 SSE 事件流的单行解析
-    void DeepSeekProvider::processSseEvent(const std::string &event, std::string &full_content, bool &streamFinish, func_stream callback)
+    void OpenAICompatProvider::processSseEvent(const std::string &event, std::string &full_content, bool &streamFinish, func_stream callback)
     {
         using namespace json_fields;
 

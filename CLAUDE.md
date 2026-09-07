@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-LLMBridge 是一个 C++17 的 LLM SDK，为多个大模型（DeepSeek、GPT/OpenAI 兼容、Gemini、Ollama 本地模型）提供统一的对话接口，并支持：
+LLMBridge 是一个 C++17 的 LLM SDK，以**三大协议族**（OpenAI 兼容 / Anthropic Messages / Gemini）为抽象，为任意模型（DeepSeek、GPT、Claude、Gemini、Ollama 本地等）提供统一的对话接口——新模型只需 JSON 配置接入，并支持：
 - **配置驱动 + 插件化注册**：通过 JSON 配置加载任意模型，无需改代码
 - **模型路由 / 故障转移**：加权路由 + 熔断 + fallback 链
 - **上下文 / Token 管理**：token 估算 + 预算裁剪 + 历史摘要
@@ -37,8 +37,8 @@ CMakeLists.txt             # 根构建入口
 cmake -B build -S .
 cmake --build build
 
-# 运行单元测试(排除需要本地 Ollama 服务的网络用例)
-./build/Debug/LLMTest.exe --gtest_filter=-OllamaLLMProviderTest.*
+# 运行单元测试(全部为无网络的纯逻辑用例)
+./build/Debug/LLMTest.exe
 
 # 运行 CLI demo(默认读 ../config/models.example.json,可用参数指定配置)
 ./build/Debug/cli_demo.exe config/models.example.json
@@ -50,9 +50,9 @@ Windows 上用 MSVC 构建时，根 CMakeLists 已加 `/utf-8`（源码为 UTF-8
 
 数据/调用流自底向上：`LLMProvider`（具体大模型）→ `LLMManager`（provider 注册表）→ `ChatSDK`（门面，含路由/上下文/工具/指标编排）→ gRPC 服务。会话侧由 `SessionManager` → `DataManager`（SQLite 持久化）并行支撑。
 
-**Provider 层**：`LLMProvider` 抽象基类。`sendMessage` 返回结构化 `LLMResponse`（content + tool_calls + 输入/输出 token），支持注入 `tools` 做 Function Calling。具体 provider：`DeepSeekProvider`（OpenAI 兼容）、`GPTProvider`（OpenAI 兼容，可指向任意兼容端点）、`GeminiProvider`（原生 Gemini 协议，硬编码走代理 `127.0.0.1:7897`）、`OllamaLLMProvider`。每个 provider 内部统一三步：`buildRequestBody`（jsoncpp 序列化，含工具注入）→ cpp-httplib HTTP POST → `parseResponse`（解析 content / tool_calls / usage token）。流式接口 `sendMessageStream` 返回字符串，逐帧回调 `func_stream = std::function<void(const std::string&, bool)>`。
+**Provider 层**：`LLMProvider` 抽象基类。`sendMessage` 返回结构化 `LLMResponse`（content + tool_calls + 输入/输出 token），支持注入 `tools` 做 Function Calling。**三大协议族**：`OpenAICompatProvider`（OpenAI 兼容，DeepSeek/GPT/Ollama(/v1)/Qwen 等都走它，api_key 可空）、`ClaudeProvider`（Anthropic Messages，x-api-key 鉴权 + tool_use/tool_result block + 独立 SSE 事件族）、`GeminiProvider`（原生 Gemini 协议，硬编码走代理 `127.0.0.1:7897`）。每个 provider 内部统一三步：`buildRequestBody`（jsoncpp 序列化，含工具注入）→ cpp-httplib HTTP POST → `parseResponse`（解析 content / tool_calls / usage token）。流式接口 `sendMessageStream` 返回字符串，逐帧回调 `func_stream = std::function<void(const std::string&, bool)>`。
 
-**配置驱动注册**：`ConfigLoader` 解析 JSON（`models` 数组）→ `vector<shared_ptr<Config>>`；`ProviderFactory` 按 `provider_type` 字符串创建 provider，`registerBuiltinProviders()` 注册内置类型（deepseek/gpt/gemini/ollama），新增类型只需 `registerProvider(type, creator)` 一行。`ChatSDK::initFromConfigFile(path)` 是配置驱动入口。模型名可通过配置 `model_name` 覆盖，实现"任意模型"。
+**配置驱动注册**：`ConfigLoader` 解析 JSON（`models` 数组）→ `vector<shared_ptr<Config>>`，**全部统一为 `ApiConfig`**（`base_url` + `api_key` + `name` 消化一切模型差异）；`ProviderFactory` 按 `provider_type` 字符串创建 provider，`registerBuiltinProviders()` 注册协议族类型（openai/gpt(别名)/claude/gemini），模型的差异走配置、**协议族**的差异才走 `registerProvider(type, creator)` 一行。`ChatSDK::initFromConfigFile(path)` 是配置驱动入口。实现"任意模型"。
 
 **模型路由**：`Router` 组件——`addBackend(model, weight, fallback)` 注册后端，`addRoute(name, backends)` 注册虚拟路由组，`plan(model)` 返回尝试顺序（加权随机主选 + 权重降序备选 + 熔断兜底 + fallback 链）。熔断：调用失败 `markUnavailable` 进入窗口，超时自动恢复（半开）。配置中 `route` 字段定义虚拟路由组，`fallback` 定义故障转移链，`weight` 定义流量权重。
 
@@ -64,9 +64,9 @@ Windows 上用 MSVC 构建时，根 CMakeLists 已加 `/utf-8`（源码为 UTF-8
 
 ## 关键注意事项
 
-- **`common.h` 核心结构**：`Message` / `ToolCall` / `Session` / `Config`（含 provider_type、weight、fallback、route、context_window）/ `ApiConfig` / `OllamaConfig` / `ModelInfo`。`fields.h` 集中 JSON 字段名常量。
-- **函数调用测试**：`test/testLLM.cc` 用 `FakeToolProvider` + `FakeWeatherTool` 纯逻辑验证工具执行循环，无需网络。
-- **网络相关测试默认排除**：`OllamaLLMProviderTest.*` 需要本地 Ollama（127.0.0.1:11434）；其余旧用例被 `#if 0` 禁用且需真实 API key 环境变量。
+- **`common.h` 核心结构**：`Message` / `ToolCall` / `Session` / `Config`（含 provider_type、weight、fallback、route、context_window）/ `ApiConfig` / `ModelInfo`。`fields.h` 集中 JSON 字段名常量。
+- **函数调用测试**：`test/testLLM.cc` 用 `FakeToolProvider`（经 `ProviderFactory::registerProvider("fake-tool", ...)` 注入，这是插件化注册的测试注入价值）+ `FakeWeatherTool` 纯逻辑验证工具执行循环，无需网络。
+- **测试无网络依赖**：所有用例均为纯逻辑（路由/上下文/指标/工具循环/配置驱动初始化），不需要真实 API key 或本地 Ollama。
 - **gRPC 服务端**：需要系统安装 gRPC/Protobuf（`find_package(gRPC CONFIG)` + `grpc_cpp_plugin`），生成代码走 CMake 自定义命令到 `build/sdk/generated/`。`grpc_server.cc` include 的是 `llm_bridge.pb.h`（依赖 include 路径，不再是 `../include/`）。
 - **修复的存量 bug**：`DataManager::getSession` 原来查 `session`（单数）表，已改为 `sessions`；`getAllSessions` 里 `ino64_t` 类型错误已改为 `sqlite3_column_int64`。
 - **运行时产物**：SQLite 数据库 `chatDB.db` 生成在工作目录，已 gitignore。

@@ -1,10 +1,10 @@
 # LLMBridge
 
-一个 C++17 编写的**大模型统一接入 SDK**：以统一的对话接口对接 DeepSeek / OpenAI 兼容（GPT 等）/ Gemini / Ollama 本地模型，并提供配置驱动注册、模型路由与故障转移、上下文 Token 管理、Function Calling 工具调用、请求可观测性等工程能力，可选通过 gRPC 对外提供服务。
+一个 C++17 编写的**大模型统一接入 SDK**：以**三大协议族**（OpenAI 兼容 / Anthropic / Gemini）为抽象，通过统一的对话接口对接任意模型——DeepSeek、GPT、Claude、Gemini、Ollama 本地等。新模型只需写配置、不改代码。并提供配置驱动注册、模型路由与故障转移、上下文 Token 管理、Function Calling 工具调用、请求可观测性等工程能力，可选通过 gRPC 对外提供服务。
 
 ## 特性
 
-- 🧩 **配置驱动 + 插件化注册**：JSON 配置加载任意模型，`ProviderFactory` 按类型字符串创建 provider，接入新模型无需改代码
+- 🧩 **配置驱动 + 协议族注册**：三大协议族（`openai` / `claude` / `gemini`）只需 JSON 配置即可接入任意模型；`ProviderFactory` 按类型注册，出现全新协议族才需要写 provider
 - 🔀 **模型路由 / 故障转移**：加权路由分配流量，失败自动熔断 + fallback 切换，超时自动恢复
 - 📐 **上下文 / Token 管理**：token 估算、按预算裁剪历史、溢出摘要保留上下文
 - 🛠️ **Function Calling**：工具 schema 注入、模型调工具、执行结果回填，多轮循环
@@ -23,7 +23,7 @@
                      │             ├─ ToolRegistry(工具循环)  │
                      │             └─ MetricsCollector(指标)  │
                      │  LLMManager ── LLMProvider (多态)      │
-                     │    DeepSeek / GPT / Gemini / Ollama   │
+                     │  OpenAICompat / Claude / Gemini (3族)  │
                      │  SessionManager ── DataManager(SQLite)│
                      └─────────────────────────────────────┘
 ```
@@ -36,8 +36,8 @@
 cmake -B build -S .
 cmake --build build
 
-# 单元测试(排除需要本地 Ollama 的网络用例)
-./build/Debug/LLMTest.exe --gtest_filter=-OllamaLLMProviderTest.*
+# 单元测试(纯逻辑用例,无需网络)
+./build/Debug/LLMTest.exe
 
 # CLI demo
 ./build/Debug/cli_demo.exe config/models.example.json
@@ -51,17 +51,29 @@ cmake --build build
 {
   "models": [
     {
-      "name": "deepseek-chat",
-      "provider": "deepseek",
+      "name": "deepseek-chat",           // 外部别名(会话/路由用)
+      "provider": "openai",              // 协议族: openai → 指向任意 OpenAI 兼容端点
       "api_key": "sk-xxx",
       "base_url": "https://api.deepseek.com",
       "temperature": 0.7,
       "max_tokens": 2048,
       "weight": 3,
-      "fallback": ["gpt-4o-mini", "gemini-2.5-flash-lite"]
+      "fallback": ["gpt-4o-mini", "claude-3-5-sonnet"]
     },
     {
-      "name": "smart",                 // 虚拟路由组: 按权重在 deepseek/gpt 间分配流量
+      "name": "claude-3-5-sonnet",
+      "provider": "claude",              // Anthropic Messages 协议
+      "api_key": "sk-ant-xxx",
+      "base_url": "https://api.anthropic.com"
+    },
+    {
+      "name": "qwen2:1.5b",
+      "provider": "openai",              // 本地 Ollama 走 /v1 兼容端点,无需联网
+      "api_key": "local",
+      "base_url": "http://127.0.0.1:11434/v1"
+    },
+    {
+      "name": "smart",                   // 虚拟路由组: 按权重在下游模型间分配流量
       "route": ["deepseek-chat", "gpt-4o-mini"]
     }
   ]
@@ -69,7 +81,8 @@ cmake --build build
 ```
 
 字段说明：
-- `provider`: provider 类型（`deepseek` / `gpt` / `gemini` / `ollama`，可注册自定义类型）
+- `provider`: 协议族类型（`openai` / `claude` / `gemini`，可注册自定义类型）；DeepSeek/Ollama/Qwen 等一律用 `openai` + 不同 `base_url`
+- `name`: 外部别名；发送给 API 的模型名沿用 `name`（协议族差异由 `base_url` 消化）
 - `weight`: 路由权重；`fallback`: 故障转移链；`route`: 虚拟路由组
 - `context_window`: 上下文窗口（token），启用后自动裁剪历史
 

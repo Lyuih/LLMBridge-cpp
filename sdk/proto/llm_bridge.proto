@@ -38,13 +38,13 @@ message Session {
 
 message ModelConfig {
   string model_name = 1;
-  string model_type = 2;    // "ollama" or "api"
+  string model_type = 2;    // 保留字段(已统一走 base_url+model_name 消化差异)
   string base_url = 3;
   string api_key = 4;
   double temperature = 5;
   int32 max_tokens = 6;
   string model_desc = 7;
-  string provider_type = 8; // 具体 provider 类型: "deepseek"/"gpt"/"gemini"/"ollama",配置驱动用
+  string provider_type = 8; // 协议族类型: "openai"/"claude"/"gemini",默认 openai,配置驱动用
   int32 weight = 9;         // 路由权重,0 表示不参与路由
   repeated string fallback = 10; // 故障转移备选模型名
 }

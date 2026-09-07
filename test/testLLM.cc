@@ -1,11 +1,10 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include "../sdk/include/logger.h"
-#include "../sdk/include/DeepSeekProvider.h"
+#include "../sdk/include/OpenAICompatProvider.h"
+#include "../sdk/include/ClaudeProvider.h"
 #include "../sdk/include/GeminiProvider.h"
-#include "../sdk/include/GPTProvider.h"
 #include "../sdk/include/LLMManager.h"
-#include "../sdk/include/OllamaLLMProvider.h"
 
 #include "../sdk/include/ChatSDK.h"
 #include "../sdk/include/ConfigLoader.h"
@@ -16,273 +15,6 @@
 #include "../sdk/include/Tool.h"
 #include "../sdk/include/common.h"
 
-#if 0
-TEST(DeepSeekProviderTest, sendMessageDeepSeek)
-{
-    std::map<std::string, std::string> param_map;
-    param_map["api_key"] = std::getenv("deepseek_apikey");
-    param_map["temperature"] = "0.7";
-    param_map["base_url"] = "https://api.deepseek.com";
-    auto deepseekProvider = std::make_shared<chat_sdk::DeepSeekProvider>();
-    ASSERT_TRUE(deepseekProvider != nullptr);
-    deepseekProvider->initModel(param_map);
-    ASSERT_TRUE(deepseekProvider->isAvailable());
-
-    std::vector<chat_sdk::Message> messages;
-    messages.push_back({"user", "你好"});
-    std::string response = deepseekProvider->sendMessage(messages, param_map);
-    ASSERT_FALSE(response.empty());
-    LOG_INFO("response:{}", response);
-}
-
-TEST(DeepSeekProviderTest, sendMessageStreamDeepSeek)
-{
-    std::map<std::string, std::string> param_map;
-    param_map["api_key"] = std::getenv("deepseek_apikey");
-    param_map["temperature"] = "0.7";
-    param_map["base_url"] = "https://api.deepseek.com";
-    auto deepseekProvider = std::make_shared<chat_sdk::DeepSeekProvider>();
-    ASSERT_TRUE(deepseekProvider != nullptr);
-    deepseekProvider->initModel(param_map);
-    ASSERT_TRUE(deepseekProvider->isAvailable());
-
-    std::vector<chat_sdk::Message> messages;
-    messages.push_back({"system", "You are a helpful assistant."});
-    messages.push_back({"user", "你好"});
-    std::string response = deepseekProvider->sendMessageStream(messages, param_map, [&](const std::string &chunk, bool last)
-                                                               {
-        LOG_INFO("chunk: {}",chunk);
-        if(last)
-        {
-            LOG_INFO("[DONE]");
-        } });
-    ASSERT_FALSE(response.empty());
-    LOG_INFO("response:{}", response);
-}
-
-
-TEST(GeminiProviderTest, sendMessageGemini)
-{
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    std::map<std::string, std::string> param_map;
-    const char *api_key_env = std::getenv("gemini_api");
-
-    if (api_key_env == nullptr)
-    {
-        std::cerr << "错误：未设置环境变量 gemini_api！" << std::endl;
-        return; // 直接退出，避免崩溃
-    }
-
-    // 确认非空后，再赋值
-    param_map["api_key"] = api_key_env;
-    param_map["temperature"] = "0.7";
-    param_map["base_url"] = "https://generativelanguage.googleapis.com";
-    auto geminiProvider = std::make_shared<chat_sdk::GeminiProvider>();
-    ASSERT_TRUE(geminiProvider != nullptr);
-    geminiProvider->initModel(param_map);
-    ASSERT_TRUE(geminiProvider->isAvailable());
-
-    std::vector<chat_sdk::Message> messages;
-    messages.push_back({"user", "你好"});
-    std::string response = geminiProvider->sendMessage(messages, param_map);
-    ASSERT_FALSE(response.empty());
-    LOG_INFO("response:{}", response);
-}
-
-TEST(GeminiProviderTest, sendMessageStreamGemini)
-{
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    std::map<std::string, std::string> param_map;
-    const char *api_key_env = std::getenv("gemini_api");
-
-    if (api_key_env == nullptr)
-    {
-        std::cerr << "错误：未设置环境变量 gemini_api！" << std::endl;
-        return; // 直接退出，避免崩溃
-    }
-
-    // 确认非空后，再赋值
-    param_map["api_key"] = api_key_env;
-    param_map["temperature"] = "0.7";
-    param_map["base_url"] = "https://generativelanguage.googleapis.com";
-    auto geminiProvider = std::make_shared<chat_sdk::GeminiProvider>();
-    ASSERT_TRUE(geminiProvider != nullptr);
-    geminiProvider->initModel(param_map);
-    ASSERT_TRUE(geminiProvider->isAvailable());
-
-    std::vector<chat_sdk::Message> messages;
-    messages.push_back({"system", "You are a helpful assistant."});
-    messages.push_back({"user", "你好"});
-    std::string response = geminiProvider->sendMessageStream(messages, param_map, [&](const std::string &chunk, bool last)
-                                                             {
-        LOG_INFO("chunk: {}",chunk);
-        if(last)
-        {
-            LOG_INFO("[DONE]");
-        } });
-    ASSERT_FALSE(response.empty());
-    LOG_INFO("response:{}", response);
-}
-
-
-
-TEST(GPTProviderTest, sendMessageGPT)
-{
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    std::map<std::string, std::string> param_map;
-    const char *api_key_env = std::getenv("GPT_apikey");
-
-    if (api_key_env == nullptr)
-    {
-        std::cerr << "错误：未设置环境变量 GPT_apikey！" << std::endl;
-        return; // 直接退出，避免崩溃
-    }
-
-    // 确认非空后，再赋值
-    param_map["api_key"] = api_key_env;
-    param_map["temperature"] = "0.7";
-    param_map["base_url"] = "https://api.openai.com";
-    auto GptProvider = std::make_shared<chat_sdk::GPTProvider>();
-    ASSERT_TRUE(GptProvider != nullptr);
-    GptProvider->initModel(param_map);
-    ASSERT_TRUE(GptProvider->isAvailable());
-
-    std::vector<chat_sdk::Message> messages;
-    messages.push_back({"user", "你好"});
-    std::string response = GptProvider->sendMessage(messages, param_map);
-    ASSERT_FALSE(response.empty());
-    LOG_INFO("response:{}", response);
-}
-
-TEST(LLMManagerTest, ProviderTest)
-{
-    std::map<std::string, std::string> param_map;
-    const char *api_key_env = std::getenv("deepseek_apikey");
-
-    if (api_key_env == nullptr)
-    {
-        std::cerr << "错误：未设置环境变量 deepseek_apikey！" << std::endl;
-        return; // 直接退出，避免崩溃
-    }
-
-    // 确认非空后，再赋值
-    param_map["api_key"] = api_key_env;
-    param_map["temperature"] = "0.7";
-    param_map["base_url"] = "https://api.deepseek.com";
-    auto deepseek_Provider = std::make_unique<chat_sdk::DeepSeekProvider>();
-    chat_sdk::LLMManager manager;
-    manager.registerProvider("deepseek-chat", std::move(deepseek_Provider));
-    manager.initModel("deepseek-chat", param_map);
-    // ASSERT_TRUE(GptProvider != nullptr);
-    // GptProvider->initModel(param_map);
-    ASSERT_TRUE(manager.isModelAvilable("deepseek-chat"));
-
-    std::vector<chat_sdk::Message> messages;
-    messages.push_back({"user", "你好"});
-    std::string response = manager.sendMessage("deepseek-chat", messages, param_map);
-    ASSERT_FALSE(response.empty());
-    // LOG_INFO("response:{}", response);
-}
-
-TEST(ChatSDKTest, ChatSDKInitTest)
-{
-    auto sdk = std::make_shared<chat_sdk::ChatSDK>();
-    ASSERT_TRUE(sdk != nullptr);
-
-    // 配置支持的模型参数,云模型-deepseek gpt gemini
-    auto deepseek_config = std::make_shared<chat_sdk::ApiConfig>();
-    ASSERT_TRUE(deepseek_config != nullptr);
-    deepseek_config->model_name = "deepseek-chat";
-    const char *deepseek_apikey = getenv("deepseek_apikey");
-    ASSERT_TRUE(deepseek_apikey != nullptr);
-    deepseek_config->api_key = deepseek_apikey;
-    deepseek_config->endPoint_ = "https://api.deepseek.com";
-
-    // gpt TODO_
-
-    // gemini
-
-    auto gemini_config = std::make_shared<chat_sdk::ApiConfig>();
-    ASSERT_TRUE(gemini_config != nullptr);
-
-    gemini_config->model_name = "gemini-2.0-flash";
-    const char *gemini_apikey = getenv("gemini_apikey");
-    ASSERT_TRUE(gemini_apikey != nullptr);
-    gemini_config->api_key = gemini_apikey;
-    gemini_config->endPoint_ = "https://generativelanguage.googleapis.com";
-
-    // 加入sdk
-    std::vector<std::shared_ptr<chat_sdk::Config>> configs{deepseek_config, gemini_config};
-
-    ASSERT_TRUE(sdk->initModels(configs));
-
-    // 创建会话
-    auto session_id = sdk->createSession(deepseek_config->model_name);
-    ASSERT_FALSE(session_id.empty());
-
-    std::string message = "你好";
-    // std::cout << ">>>";
-    // std::getline(std::cin, message);
-    auto response = sdk->sendMessage(session_id, message);
-    ASSERT_FALSE(response.empty());
-
-    // 获取会话历史消息
-    auto messages = sdk->sessionManager_.getSessionHistory(session_id);
-    for (const auto &msg : messages)
-    {
-        std::cout << msg.role << ": " << msg.content << std::endl;
-    }
-    ASSERT_FALSE(messages.empty());
-}
-
-TEST(OllamaLLMProviderTest, sendMessageOllama)
-{
-    std::map<std::string, std::string> param_map;
-    // param_map["api_key"] = std::getenv("deepseek_apikey");
-    param_map["model_name"] = "qwen2:1.5b";
-    param_map["model_desc"] = "我是一个人工智能助手，专门在这里帮助人们解答问题。有其他问题我可以回答吗";
-    param_map["temperature"] = "0.7";
-    param_map["base_url"] = "http://127.0.0.1:11434";
-    auto ollamaProvider = std::make_shared<chat_sdk::OllamaLLMProvider>();
-    ASSERT_TRUE(ollamaProvider != nullptr);
-    ollamaProvider->initModel(param_map);
-    ASSERT_TRUE(ollamaProvider->isAvailable());
-
-    std::vector<chat_sdk::Message> messages;
-    messages.push_back({"user", "你好"});
-    std::string response = ollamaProvider->sendMessage(messages, param_map);
-    ASSERT_FALSE(response.empty());
-    LOG_INFO("response:{}", response);
-}
-#endif
-
-
-TEST(OllamaLLMProviderTest, sendMessageOllamaStream)
-{
-    std::map<std::string, std::string> param_map;
-    // param_map["api_key"] = std::getenv("deepseek_apikey");
-    param_map["model_name"] = "qwen2:1.5b";
-    param_map["model_desc"] = "我是一个人工智能助手，专门在这里帮助人们解答问题。有其他问题我可以回答吗";
-    param_map["temperature"] = "0.7";
-    param_map["base_url"] = "http://127.0.0.1:11434";
-    auto ollamaProvider = std::make_shared<chat_sdk::OllamaLLMProvider>();
-    ASSERT_TRUE(ollamaProvider != nullptr);
-    ollamaProvider->initModel(param_map);
-    ASSERT_TRUE(ollamaProvider->isAvailable());
-
-    std::vector<chat_sdk::Message> messages;
-    messages.push_back({"user", "你是谁"});
-    std::string response = ollamaProvider->sendMessageStream(messages, param_map, [&](const std::string &chunk, bool last)
-                                                             {
-        LOG_INFO("chunk: {}",chunk);
-        if(last)
-        {
-            LOG_INFO("[DONE]");
-        } });
-    ASSERT_FALSE(response.empty());
-    LOG_INFO("response:{}", response);
-}
-
 // ==================== 纯逻辑测试(无需网络) ====================
 
 TEST(ConfigLoaderTest, loadFromString)
@@ -292,7 +24,7 @@ TEST(ConfigLoaderTest, loadFromString)
       "models": [
         {
           "name": "deepseek-chat",
-          "provider": "deepseek",
+          "provider": "openai",
           "api_key": "sk-test",
           "base_url": "https://api.deepseek.com",
           "temperature": 0.5,
@@ -302,8 +34,8 @@ TEST(ConfigLoaderTest, loadFromString)
         },
         {
           "name": "qwen2:1.5b",
-          "provider": "ollama",
-          "base_url": "http://127.0.0.1:11434"
+          "provider": "openai",
+          "base_url": "http://127.0.0.1:11434/v1"
         }
       ]
     })";
@@ -315,7 +47,7 @@ TEST(ConfigLoaderTest, loadFromString)
     // API 模型
     const auto &c1 = configs[0];
     EXPECT_EQ(c1->model_name, "deepseek-chat");
-    EXPECT_EQ(c1->provider_type, "deepseek");
+    EXPECT_EQ(c1->provider_type, "openai");
     EXPECT_EQ(c1->temperature, 0.5);
     EXPECT_EQ(c1->max_tokens, 1024);
     EXPECT_EQ(c1->weight, 3);
@@ -327,19 +59,19 @@ TEST(ConfigLoaderTest, loadFromString)
     EXPECT_EQ(api->api_key, "sk-test");
     EXPECT_EQ(api->endPoint_, "https://api.deepseek.com");
 
-    // Ollama 模型
+    // 本地模型三大协议族统一走 ApiConfig,不带 api_key
     const auto &c2 = configs[1];
     EXPECT_EQ(c2->model_name, "qwen2:1.5b");
-    EXPECT_EQ(c2->provider_type, "ollama");
+    EXPECT_EQ(c2->provider_type, "openai");
     EXPECT_EQ(c2->weight, 1); // 默认权重
-    auto ollama = std::dynamic_pointer_cast<chat_sdk::OllamaConfig>(c2);
-    ASSERT_NE(ollama, nullptr);
-    EXPECT_EQ(ollama->endPoint_, "http://127.0.0.1:11434");
+    auto local = std::dynamic_pointer_cast<chat_sdk::ApiConfig>(c2);
+    ASSERT_NE(local, nullptr);
+    EXPECT_EQ(local->endPoint_, "http://127.0.0.1:11434/v1");
 }
 
 TEST(ConfigLoaderTest, loadInvalidMissingName)
 {
-    const std::string json = R"({ "models": [ { "provider": "deepseek" } ] })";
+    const std::string json = R"({ "models": [ { "provider": "openai" } ] })";
     std::string error;
     auto configs = chat_sdk::ConfigLoader::loadFromString(json, error);
     EXPECT_TRUE(configs.empty());
@@ -351,26 +83,26 @@ TEST(ProviderFactoryTest, createKnownTypes)
     chat_sdk::registerBuiltinProviders();
     auto &factory = chat_sdk::ProviderFactory::instance();
 
-    // 动态类型校验
+    // 三大协议族: openai(OpenAI 兼容) / claude / gemini
     {
-        auto p = factory.create("deepseek");
+        auto p = factory.create("openai");
         ASSERT_NE(p, nullptr);
-        EXPECT_NE(dynamic_cast<chat_sdk::DeepSeekProvider *>(p.get()), nullptr);
+        EXPECT_NE(dynamic_cast<chat_sdk::OpenAICompatProvider *>(p.get()), nullptr);
     }
     {
-        auto p = factory.create("gpt");
+        auto p = factory.create("gpt"); // 兼容别名,仍是 OpenAI 兼容协议
         ASSERT_NE(p, nullptr);
-        EXPECT_NE(dynamic_cast<chat_sdk::GPTProvider *>(p.get()), nullptr);
+        EXPECT_NE(dynamic_cast<chat_sdk::OpenAICompatProvider *>(p.get()), nullptr);
+    }
+    {
+        auto p = factory.create("claude");
+        ASSERT_NE(p, nullptr);
+        EXPECT_NE(dynamic_cast<chat_sdk::ClaudeProvider *>(p.get()), nullptr);
     }
     {
         auto p = factory.create("gemini");
         ASSERT_NE(p, nullptr);
         EXPECT_NE(dynamic_cast<chat_sdk::GeminiProvider *>(p.get()), nullptr);
-    }
-    {
-        auto p = factory.create("ollama");
-        ASSERT_NE(p, nullptr);
-        EXPECT_NE(dynamic_cast<chat_sdk::OllamaLLMProvider *>(p.get()), nullptr);
     }
 }
 
@@ -381,19 +113,43 @@ TEST(ProviderFactoryTest, createUnknownType)
     EXPECT_EQ(factory.create("不存在的类型"), nullptr);
 }
 
+TEST(OpenAICompatProviderTest, initModelLocalWithoutApiKey)
+{
+    // 本地 Ollama/vLLM 端点走 OpenAI 兼容协议,无需 api_key
+    chat_sdk::OpenAICompatProvider provider;
+    std::map<std::string, std::string> param;
+    param["base_url"] = "http://127.0.0.1:11434/v1";
+    param["model_name"] = "qwen2:1.5b";
+    EXPECT_TRUE(provider.initModel(param));
+    EXPECT_TRUE(provider.isAvailable());
+    EXPECT_EQ(provider.getModelName(), "qwen2:1.5b");
+}
+
+TEST(ClaudeProviderTest, initModelWithoutNetwork)
+{
+    chat_sdk::ClaudeProvider provider;
+    std::map<std::string, std::string> param;
+    param["base_url"] = "https://api.anthropic.com";
+    param["model_name"] = "claude-3-5-sonnet-20241022";
+    EXPECT_TRUE(provider.initModel(param));
+    EXPECT_TRUE(provider.isAvailable());
+    EXPECT_EQ(provider.getModelName(), "claude-3-5-sonnet-20241022");
+}
+
 TEST(ChatSDKTest, configDrivenInit)
 {
     auto sdk = std::make_shared<chat_sdk::ChatSDK>();
     ASSERT_TRUE(sdk != nullptr);
 
-    // 只注册一个本地 ollama 模型,不需要网络即可验证配置驱动初始化链路
+    // 配置驱动的 OpenAI 兼容本地模型,不需要网络即可验证初始化链路
     const std::string json = R"(
     {
       "models": [
         {
           "name": "qwen2:1.5b",
-          "provider": "ollama",
-          "base_url": "http://127.0.0.1:11434",
+          "provider": "openai",
+          "base_url": "http://127.0.0.1:11434/v1",
+          "api_key": "local",
           "desc": "本地测试模型"
         }
       ]
@@ -423,12 +179,12 @@ TEST(ChatSDKTest, configDrivenInitUnknownProvider)
         {
           "name": "bad-model",
           "provider": "不存在的类型",
-          "base_url": "http://127.0.0.1:11434"
+          "base_url": "http://127.0.0.1:11434/v1"
         },
         {
           "name": "qwen2:1.5b",
-          "provider": "ollama",
-          "base_url": "http://127.0.0.1:11434"
+          "provider": "openai",
+          "base_url": "http://127.0.0.1:11434/v1"
         }
       ]
     })";
@@ -618,7 +374,7 @@ namespace
 
 TEST(ChatSDKTest, functionCallingLoop)
 {
-    // 注册假 provider 类型
+    // 注册假 provider 类型(插件化注册的注入点: 无网络的端到端测试)
     chat_sdk::ProviderFactory::instance().registerProvider(
         "fake-tool", []() { return std::make_unique<FakeToolProvider>(); });
 
